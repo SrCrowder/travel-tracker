@@ -1,238 +1,147 @@
 import { Router, Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs';
 import db from '../database/db';
-import upload, { UPLOADS_DIR, verifyImages, removeUploadedFiles } from '../middleware/upload';
-import { Trip } from '../types';
+import upload, { verifyImages, removeUploadedFiles, deleteUpload } from '../middleware/upload';
+import { getTrip, getTripRow, listTrips } from '../database/queries';
+import { tripCreateSchema, tripUpdateSchema, validate } from '../validation';
+import type { PhotoRow } from '../types';
+import { z } from 'zod';
 
 const router = Router();
 
-const MAX_TAGS = 20;
-const MAX_TAG_LENGTH = 40;
+type NewLocation = z.output<typeof tripCreateSchema>['new_locations'][number];
 
-// Accepts tags as an array or a JSON-encoded array (multipart form field).
-// Returns the cleaned JSON to store, or null if the value is invalid.
-function normalizeTags(raw: unknown): string | null {
-  let value = raw;
-  if (typeof value === 'string') {
-    try { value = JSON.parse(value); } catch { return null; }
-  }
-  if (!Array.isArray(value) || value.length > MAX_TAGS) return null;
-  if (!value.every((t) => typeof t === 'string' && t.length > 0 && t.length <= MAX_TAG_LENGTH)) return null;
-  return JSON.stringify([...new Set(value)]);
+function insertLocations(tripId: number | bigint, locations: NewLocation[], firstIndex: number) {
+  const insertLocation = db.prepare(`
+    INSERT INTO locations (trip_id, name, country, lat, lng, date_start, date_end, description, notes, order_index, rating)
+    VALUES (@trip_id, @name, @country, @lat, @lng, @date_start, @date_end, @description, @notes, @order_index, @rating)
+  `);
+  locations.forEach((loc, i) => insertLocation.run({
+    trip_id: tripId,
+    name: loc.name,
+    country: loc.country,
+    lat: loc.lat,
+    lng: loc.lng,
+    date_start: loc.date_start ?? null,
+    date_end: loc.date_end ?? null,
+    description: loc.description,
+    notes: loc.notes,
+    order_index: firstIndex + i,
+    rating: loc.rating ?? null,
+  }));
 }
 
-// Never let one bad row break the whole listing
-function parseTags(stored: string | null | undefined): string[] {
-  try {
-    const value = JSON.parse(stored || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function removeFile(filename: string | null | undefined) {
-  if (filename) fs.rmSync(path.join(UPLOADS_DIR, filename), { force: true });
+// Renumbers order_index 0..n-1, keeping the current order
+function compactOrder(tripId: number | string) {
+  const ids = db.prepare('SELECT id FROM locations WHERE trip_id = ? ORDER BY order_index, id')
+    .all(tripId) as { id: number }[];
+  const update = db.prepare('UPDATE locations SET order_index = ? WHERE id = ?');
+  ids.forEach(({ id }, i) => update.run(i, id));
 }
 
 // ─── GET all trips (with location summaries) ────────────────────────────────
 router.get('/', (_req: Request, res: Response) => {
-  try {
-    const rows = db.prepare(`
-      SELECT
-        t.*,
-        COALESCE(
-          (SELECT json_group_array(json_object(
-            'id',          l.id,
-            'trip_id',     l.trip_id,
-            'name',        l.name,
-            'country',     l.country,
-            'lat',         l.lat,
-            'lng',         l.lng,
-            'date_start',  l.date_start,
-            'date_end',    l.date_end,
-            'description', l.description,
-            'notes',       l.notes,
-            'order_index', l.order_index,
-            'rating',      l.rating
-          ))
-          FROM locations l WHERE l.trip_id = t.id
-          ORDER BY l.order_index
-        ), '[]'
-        ) AS locations_json
-      FROM trips t
-      ORDER BY t.start_date DESC
-    `).all() as any[];
-
-    const result = rows.map((row) => ({
-      ...row,
-      tags: parseTags(row.tags),
-      locations: JSON.parse(row.locations_json || '[]'),
-      locations_json: undefined,
-    }));
-
-    res.json(result);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch trips' });
-  }
+  res.json(listTrips());
 });
 
 // ─── GET single trip (with locations + photos) ───────────────────────────────
 router.get('/:id', (req: Request, res: Response) => {
-  try {
-    const trip = db.prepare('SELECT * FROM trips WHERE id = ?').get(req.params.id) as Trip | undefined;
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
-
-    const locations = db.prepare(`
-      SELECT
-        l.*,
-        COALESCE(
-          (SELECT json_group_array(json_object(
-            'id',            p.id,
-            'location_id',   p.location_id,
-            'trip_id',       p.trip_id,
-            'filename',      p.filename,
-            'original_name', p.original_name,
-            'caption',       p.caption,
-            'created_at',    p.created_at
-          ))
-          FROM photos p WHERE p.location_id = l.id
-        ), '[]'
-        ) AS photos_json
-      FROM locations l
-      WHERE l.trip_id = ?
-      ORDER BY l.order_index
-    `).all(req.params.id) as any[];
-
-    const tripPhotos = db.prepare(
-      'SELECT * FROM photos WHERE trip_id = ? AND location_id IS NULL ORDER BY created_at'
-    ).all(req.params.id);
-
-    res.json({
-      ...trip,
-      tags: parseTags(trip.tags),
-      locations: locations.map((l) => ({
-        ...l,
-        photos: JSON.parse(l.photos_json || '[]'),
-        photos_json: undefined,
-      })),
-      photos: tripPhotos,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch trip' });
-  }
+  const trip = getTrip(req.params.id);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  res.json(trip);
 });
 
-// ─── POST create trip ────────────────────────────────────────────────────────
+// ─── POST create trip (and its first locations, atomically) ─────────────────
 router.post('/', upload.single('cover_image'), verifyImages, (req: Request, res: Response) => {
+  const body = validate(tripCreateSchema, req.body, res);
+  if (!body) return removeUploadedFiles(req);
+
   try {
-    const { title, description, start_date, end_date, tags, cover_position_x, cover_position_y } = req.body;
-
-    if (!title || !start_date || !end_date) {
-      removeUploadedFiles(req);
-      return res.status(400).json({ error: 'title, start_date, and end_date are required' });
-    }
-
-    const tagsJson = normalizeTags(tags ?? []);
-    if (tagsJson === null) {
-      removeUploadedFiles(req);
-      return res.status(400).json({ error: 'tags must be an array of short strings' });
-    }
-
-    const cover_image = req.file?.filename ?? null;
-    const posX = cover_position_x !== undefined ? parseFloat(cover_position_x) : 50;
-    const posY = cover_position_y !== undefined ? parseFloat(cover_position_y) : 50;
-
-    const result = db.prepare(`
-      INSERT INTO trips (title, description, start_date, end_date, cover_image, tags, cover_position_x, cover_position_y)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(title, description || '', start_date, end_date, cover_image, tagsJson, posX, posY);
-
-    const newTrip = db.prepare('SELECT * FROM trips WHERE id = ?').get(result.lastInsertRowid) as any;
-    res.status(201).json({ ...newTrip, tags: parseTags(newTrip.tags), locations: [] });
+    const tripId = db.transaction(() => {
+      const result = db.prepare(`
+        INSERT INTO trips (title, description, start_date, end_date, cover_image, tags, cover_position_x, cover_position_y)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(body.title, body.description, body.start_date, body.end_date, req.file?.filename ?? null,
+        JSON.stringify(body.tags), body.cover_position_x, body.cover_position_y);
+      insertLocations(result.lastInsertRowid, body.new_locations, 0);
+      return result.lastInsertRowid;
+    })();
+    res.status(201).json(getTrip(Number(tripId)));
   } catch (err) {
-    console.error(err);
     removeUploadedFiles(req);
-    res.status(500).json({ error: 'Failed to create trip' });
+    throw err;
   }
 });
 
-// ─── PUT update trip ─────────────────────────────────────────────────────────
+// ─── PUT update trip (plus added/removed locations, atomically) ─────────────
 router.put('/:id', upload.single('cover_image'), verifyImages, (req: Request, res: Response) => {
-  try {
-    const existing = db.prepare('SELECT * FROM trips WHERE id = ?').get(req.params.id) as any;
-    if (!existing) {
-      removeUploadedFiles(req);
-      return res.status(404).json({ error: 'Trip not found' });
-    }
-
-    const { title, description, start_date, end_date, tags, remove_cover, cover_position_x, cover_position_y } = req.body;
-
-    const tagsJson = tags !== undefined ? normalizeTags(tags) : existing.tags;
-    if (tagsJson === null) {
-      removeUploadedFiles(req);
-      return res.status(400).json({ error: 'tags must be an array of short strings' });
-    }
-
-    let cover_image = existing.cover_image;
-    if (req.file) {
-      removeFile(existing.cover_image);
-      cover_image = req.file.filename;
-    } else if (remove_cover === 'true') {
-      removeFile(existing.cover_image);
-      cover_image = null;
-    }
-
-    const posX = cover_position_x !== undefined ? parseFloat(cover_position_x) : (existing.cover_position_x ?? 50);
-    const posY = cover_position_y !== undefined ? parseFloat(cover_position_y) : (existing.cover_position_y ?? 50);
-
-    db.prepare(`
-      UPDATE trips
-      SET title = ?, description = ?, start_date = ?, end_date = ?, cover_image = ?, tags = ?, cover_position_x = ?, cover_position_y = ?
-      WHERE id = ?
-    `).run(
-      title ?? existing.title,
-      description ?? existing.description,
-      start_date ?? existing.start_date,
-      end_date ?? existing.end_date,
-      cover_image,
-      tagsJson,
-      posX,
-      posY,
-      req.params.id,
-    );
-
-    const updated = db.prepare('SELECT * FROM trips WHERE id = ?').get(req.params.id) as any;
-    res.json({ ...updated, tags: parseTags(updated.tags) });
-  } catch (err) {
-    console.error(err);
+  const existing = getTripRow(req.params.id);
+  if (!existing) {
     removeUploadedFiles(req);
-    res.status(500).json({ error: 'Failed to update trip' });
+    return res.status(404).json({ error: 'Trip not found' });
   }
+
+  const body = validate(tripUpdateSchema, req.body, res);
+  if (!body) return removeUploadedFiles(req);
+
+  const startDate = body.start_date ?? existing.start_date;
+  const endDate = body.end_date ?? existing.end_date;
+  if (endDate < startDate) {
+    removeUploadedFiles(req);
+    return res.status(400).json({ error: 'Invalid data', details: ['end_date: must not be before start_date'] });
+  }
+
+  const replacingCover = !!req.file || body.remove_cover === true;
+  const coverImage = req.file ? req.file.filename : body.remove_cover ? null : existing.cover_image;
+
+  try {
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE trips
+        SET title = ?, description = ?, start_date = ?, end_date = ?, cover_image = ?, tags = ?,
+            cover_position_x = ?, cover_position_y = ?
+        WHERE id = ?
+      `).run(
+        body.title ?? existing.title,
+        body.description ?? existing.description,
+        startDate,
+        endDate,
+        coverImage,
+        body.tags ? JSON.stringify(body.tags) : existing.tags,
+        body.cover_position_x ?? existing.cover_position_x ?? 50,
+        body.cover_position_y ?? existing.cover_position_y ?? 50,
+        existing.id,
+      );
+
+      const remove = db.prepare('DELETE FROM locations WHERE id = ? AND trip_id = ?');
+      body.removed_location_ids.forEach((locId) => remove.run(locId, existing.id));
+
+      const { next } = db.prepare(
+        'SELECT COALESCE(MAX(order_index), -1) + 1 AS next FROM locations WHERE trip_id = ?'
+      ).get(existing.id) as { next: number };
+      insertLocations(existing.id, body.new_locations, next);
+      compactOrder(existing.id);
+    })();
+  } catch (err) {
+    removeUploadedFiles(req);
+    throw err;
+  }
+
+  // Only touch the disk once the database change is committed
+  if (replacingCover && existing.cover_image !== coverImage) deleteUpload(existing.cover_image);
+  res.json(getTrip(existing.id));
 });
 
 // ─── DELETE trip ─────────────────────────────────────────────────────────────
 router.delete('/:id', (req: Request, res: Response) => {
-  try {
-    const trip = db.prepare('SELECT * FROM trips WHERE id = ?').get(req.params.id) as any;
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  const trip = getTripRow(req.params.id);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
 
-    // Remove all associated photo files from disk
-    const photos = db.prepare('SELECT filename FROM photos WHERE trip_id = ?').all(req.params.id) as any[];
-    photos.forEach((p) => removeFile(p.filename));
+  const photos = db.prepare('SELECT filename FROM photos WHERE trip_id = ?').all(trip.id) as Pick<PhotoRow, 'filename'>[];
+  db.prepare('DELETE FROM trips WHERE id = ?').run(trip.id);
 
-    // Remove cover image file
-    removeFile(trip.cover_image);
-
-    db.prepare('DELETE FROM trips WHERE id = ?').run(req.params.id);
-    res.json({ message: 'Trip deleted successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete trip' });
-  }
+  photos.forEach((p) => deleteUpload(p.filename));
+  deleteUpload(trip.cover_image);
+  res.json({ message: 'Trip deleted successfully' });
 });
 
 export default router;

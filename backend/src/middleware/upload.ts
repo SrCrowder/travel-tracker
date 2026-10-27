@@ -1,14 +1,11 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
+import { UPLOADS_DIR } from '../config';
 
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // The stored extension comes from this allowlist, never from the client's
 // filename, so an upload can't end up served as .html/.svg/.js.
@@ -25,7 +22,7 @@ const storage = multer.diskStorage({
     cb(null, UPLOADS_DIR);
   },
   filename: (_req, file, cb) => {
-    cb(null, `${uuidv4()}${EXTENSIONS[file.mimetype]}`);
+    cb(null, `${crypto.randomUUID()}${EXTENSIONS[file.mimetype]}`);
   },
 });
 
@@ -81,6 +78,12 @@ export function verifyImages(req: Request, res: Response, next: NextFunction) {
   if (!bad) return next();
   removeUploadedFiles(req);
   res.status(400).json({ error: 'Only image files (jpg, png, webp, gif) are allowed' });
+}
+
+/** Deletes a stored upload; ignores missing files and names with a path in them. */
+export function deleteUpload(filename: string | null | undefined): void {
+  if (!filename || filename !== path.basename(filename)) return;
+  fs.rmSync(path.join(UPLOADS_DIR, filename), { force: true });
 }
 
 // Headers for serving /uploads: never sniff or run the content as a page.

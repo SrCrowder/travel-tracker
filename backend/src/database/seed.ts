@@ -1,16 +1,9 @@
 import db from './db';
 
-// ─── Exported function — safe to call from the server on startup ──────────────
-export function seedIfEmpty(): void {
-  const { count } = db
-    .prepare('SELECT COUNT(*) as count FROM trips')
-    .get() as { count: number };
-
-  if (count > 0) {
-    console.log('⏭  Seed skipped — database already has data.');
-    return;
-  }
-
+// ─── Demo trips, added once when the database is first created ───────────────
+// (initDatabase only calls this for a brand-new database, so deleting every
+// trip doesn't bring the demo data back on the next restart.)
+export function seedDemoData(): void {
   const insertTrip = db.prepare(`
     INSERT INTO trips (title, description, start_date, end_date, tags)
     VALUES (?, ?, ?, ?, ?)
@@ -102,10 +95,10 @@ export function seedIfEmpty(): void {
   console.log('✅ Database seeded: 3 sample trips loaded.');
 }
 
-// ─── Also runnable as a standalone script ────────────────────────────────────
-// ts-node src/database/seed.ts
+// ─── Also runnable as a standalone script: npm run seed ──────────────────────
+// Adds the demo trips to the current database, whatever it contains.
 if (require.main === module) {
-  const { initializeSchema } = require('./schema');
-  initializeSchema();
-  seedIfEmpty();
+  const { migrate } = require('./migrations');
+  migrate(db);
+  seedDemoData();
 }

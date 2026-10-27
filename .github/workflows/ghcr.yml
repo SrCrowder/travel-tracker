@@ -5,6 +5,8 @@
 # - push a main        -> :latest, :AAAA.MM.DD y :sha-<commit>
 # - tag vX.Y.Z         -> :X.Y.Z y :X.Y
 # - manual             -> pestaña Actions -> "Publicar imagen en ghcr.io" -> Run workflow
+#
+# Antes de publicar se ejecutan los tests del backend y el build del frontend.
 name: Publicar imagen en ghcr.io
 
 on:
@@ -27,7 +29,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Las imágenes solo se publican si pasan los tests del backend y compila el frontend
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Backend — tests
+        working-directory: backend
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+      - name: Frontend — build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

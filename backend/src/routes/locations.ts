@@ -1,149 +1,80 @@
 import { Router, Request, Response } from 'express';
 import db from '../database/db';
-import { Location } from '../types';
+import { getLocation, getTripRow, listLocations } from '../database/queries';
+import { locationCreateSchema, locationUpdateSchema, reorderSchema, validate } from '../validation';
 
 const router = Router({ mergeParams: true });
 
 // ─── GET all locations for a trip ────────────────────────────────────────────
 router.get('/', (req: Request, res: Response) => {
-  try {
-    const locations = db.prepare(`
-      SELECT l.*,
-        COALESCE(
-          (SELECT json_group_array(json_object(
-            'id', p.id, 'location_id', p.location_id,
-            'trip_id', p.trip_id, 'filename', p.filename,
-            'original_name', p.original_name, 'caption', p.caption,
-            'created_at', p.created_at
-          )) FROM photos p WHERE p.location_id = l.id), '[]'
-        ) AS photos_json
-      FROM locations l
-      WHERE l.trip_id = ?
-      ORDER BY l.order_index
-    `).all(req.params.tripId) as any[];
-
-    res.json(locations.map((l) => ({
-      ...l,
-      photos: JSON.parse(l.photos_json || '[]'),
-      photos_json: undefined,
-    })));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch locations' });
-  }
+  res.json(listLocations(req.params.tripId));
 });
 
 // ─── POST create location for a trip ─────────────────────────────────────────
 router.post('/', (req: Request, res: Response) => {
-  try {
-    const trip = db.prepare('SELECT id FROM trips WHERE id = ?').get(req.params.tripId);
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  if (!getTripRow(req.params.tripId)) return res.status(404).json({ error: 'Trip not found' });
 
-    const { name, country, lat, lng, date_start, date_end, description, notes, rating } = req.body;
+  const body = validate(locationCreateSchema, req.body, res);
+  if (!body) return;
 
-    if (!name || lat === undefined || lng === undefined) {
-      return res.status(400).json({ error: 'name, lat, and lng are required' });
-    }
+  // Appended at the end unless an explicit position is given
+  const { next } = db.prepare(
+    'SELECT COALESCE(MAX(order_index), -1) + 1 AS next FROM locations WHERE trip_id = ?'
+  ).get(req.params.tripId) as { next: number };
 
-    // Auto-assign next order_index
-    const maxOrder = db.prepare(
-      'SELECT COALESCE(MAX(order_index), -1) as max FROM locations WHERE trip_id = ?'
-    ).get(req.params.tripId) as { max: number };
+  const result = db.prepare(`
+    INSERT INTO locations (trip_id, name, country, lat, lng, date_start, date_end, description, notes, order_index, rating)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    req.params.tripId, body.name, body.country, body.lat, body.lng,
+    body.date_start ?? null, body.date_end ?? null, body.description, body.notes,
+    body.order_index ?? next, body.rating ?? null,
+  );
 
-    const result = db.prepare(`
-      INSERT INTO locations (trip_id, name, country, lat, lng, date_start, date_end, description, notes, order_index, rating)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      req.params.tripId,
-      name,
-      country || '',
-      Number(lat),
-      Number(lng),
-      date_start || null,
-      date_end || null,
-      description || '',
-      notes || '',
-      maxOrder.max + 1,
-      rating ? Number(rating) : null,
-    );
-
-    const newLocation = db.prepare('SELECT * FROM locations WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ ...(newLocation as object), photos: [] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create location' });
-  }
+  res.status(201).json({ ...getLocation(req.params.tripId, Number(result.lastInsertRowid)), photos: [] });
 });
 
 // ─── PUT update location ──────────────────────────────────────────────────────
 router.put('/:locationId', (req: Request, res: Response) => {
-  try {
-    const existing = db.prepare('SELECT * FROM locations WHERE id = ? AND trip_id = ?')
-      .get(req.params.locationId, req.params.tripId) as Location | undefined;
-    if (!existing) return res.status(404).json({ error: 'Location not found' });
+  const existing = getLocation(req.params.tripId, req.params.locationId);
+  if (!existing) return res.status(404).json({ error: 'Location not found' });
 
-    const { name, country, lat, lng, date_start, date_end, description, notes, order_index, rating } = req.body;
+  const body = validate(locationUpdateSchema, req.body, res);
+  if (!body) return;
 
-    db.prepare(`
-      UPDATE locations
-      SET name = ?, country = ?, lat = ?, lng = ?, date_start = ?, date_end = ?,
-          description = ?, notes = ?, order_index = ?, rating = ?
-      WHERE id = ? AND trip_id = ?
-    `).run(
-      name ?? existing.name,
-      country ?? existing.country,
-      lat !== undefined ? Number(lat) : existing.lat,
-      lng !== undefined ? Number(lng) : existing.lng,
-      date_start !== undefined ? date_start : existing.date_start,
-      date_end !== undefined ? date_end : existing.date_end,
-      description ?? existing.description,
-      notes ?? existing.notes,
-      order_index !== undefined ? Number(order_index) : existing.order_index,
-      rating !== undefined ? (rating ? Number(rating) : null) : existing.rating,
-      req.params.locationId,
-      req.params.tripId,
-    );
-
-    const updated = db.prepare('SELECT * FROM locations WHERE id = ?').get(req.params.locationId);
-    res.json(updated);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update location' });
+  const merged = { ...existing, ...Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined)) };
+  if (merged.date_start && merged.date_end && merged.date_end < merged.date_start) {
+    return res.status(400).json({ error: 'Invalid data', details: ['date_end: must not be before date_start'] });
   }
+
+  db.prepare(`
+    UPDATE locations
+    SET name = @name, country = @country, lat = @lat, lng = @lng, date_start = @date_start, date_end = @date_end,
+        description = @description, notes = @notes, order_index = @order_index, rating = @rating
+    WHERE id = @id AND trip_id = @trip_id
+  `).run(merged);
+
+  res.json(getLocation(req.params.tripId, req.params.locationId));
 });
 
 // ─── DELETE location ──────────────────────────────────────────────────────────
 router.delete('/:locationId', (req: Request, res: Response) => {
-  try {
-    const result = db.prepare('DELETE FROM locations WHERE id = ? AND trip_id = ?')
-      .run(req.params.locationId, req.params.tripId);
-    if (result.changes === 0) return res.status(404).json({ error: 'Location not found' });
-
-    res.json({ message: 'Location deleted' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete location' });
-  }
+  const result = db.prepare('DELETE FROM locations WHERE id = ? AND trip_id = ?')
+    .run(req.params.locationId, req.params.tripId);
+  if (result.changes === 0) return res.status(404).json({ error: 'Location not found' });
+  res.json({ message: 'Location deleted' });
 });
 
 // ─── POST reorder locations ───────────────────────────────────────────────────
 router.post('/reorder', (req: Request, res: Response) => {
-  try {
-    const { order } = req.body as { order: Array<{ id: number; order_index: number }> };
-    if (!Array.isArray(order)) return res.status(400).json({ error: 'order array is required' });
+  const body = validate(reorderSchema, req.body, res);
+  if (!body) return;
 
-    const update = db.prepare('UPDATE locations SET order_index = ? WHERE id = ? AND trip_id = ?');
-    const reorderAll = db.transaction(() => {
-      order.forEach(({ id, order_index }) => {
-        update.run(order_index, id, req.params.tripId);
-      });
-    });
-    reorderAll();
-    res.json({ message: 'Locations reordered' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to reorder locations' });
-  }
+  const update = db.prepare('UPDATE locations SET order_index = ? WHERE id = ? AND trip_id = ?');
+  db.transaction(() => {
+    body.order.forEach(({ id, order_index }) => update.run(order_index, id, req.params.tripId));
+  })();
+  res.json({ message: 'Locations reordered' });
 });
 
 export default router;

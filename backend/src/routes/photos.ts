@@ -1,120 +1,78 @@
 import { Router, Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs';
 import db from '../database/db';
-import upload, { UPLOADS_DIR, verifyImages, removeUploadedFiles } from '../middleware/upload';
+import upload, { verifyImages, removeUploadedFiles, deleteUpload } from '../middleware/upload';
+import { getLocation, getPhoto, getTripRow } from '../database/queries';
+import { photoUpdateSchema, photoUploadSchema, validate } from '../validation';
+import type { PhotoRow } from '../types';
 
 const router = Router({ mergeParams: true });
 
 // ─── GET photos for a trip (optionally filtered by location) ─────────────────
 router.get('/', (req: Request, res: Response) => {
-  try {
-    const { location_id } = req.query;
-    let photos;
-
-    if (location_id) {
-      photos = db.prepare(
-        'SELECT * FROM photos WHERE trip_id = ? AND location_id = ? ORDER BY created_at'
-      ).all(req.params.tripId, location_id);
-    } else {
-      photos = db.prepare(
-        'SELECT * FROM photos WHERE trip_id = ? ORDER BY created_at'
-      ).all(req.params.tripId);
-    }
-
-    res.json(photos);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch photos' });
-  }
+  const { location_id } = req.query;
+  const photos = location_id
+    ? db.prepare('SELECT * FROM photos WHERE trip_id = ? AND location_id = ? ORDER BY created_at, id')
+      .all(req.params.tripId, String(location_id))
+    : db.prepare('SELECT * FROM photos WHERE trip_id = ? ORDER BY created_at, id').all(req.params.tripId);
+  res.json(photos);
 });
 
 // ─── POST upload photos ───────────────────────────────────────────────────────
 router.post('/', upload.array('photos', 20), verifyImages, (req: Request, res: Response) => {
-  try {
-    const trip = db.prepare('SELECT id FROM trips WHERE id = ?').get(req.params.tripId);
-    if (!trip) {
-      removeUploadedFiles(req);
-      return res.status(404).json({ error: 'Trip not found' });
-    }
-
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      return res.status(400).json({ error: 'No files uploaded' });
-    }
-
-    const { location_id, caption } = req.body;
-    const locationId = location_id ? Number(location_id) : null;
-
-    // Validate location belongs to trip
-    if (locationId) {
-      const loc = db.prepare('SELECT id FROM locations WHERE id = ? AND trip_id = ?')
-        .get(locationId, req.params.tripId);
-      if (!loc) {
-        removeUploadedFiles(req);
-        return res.status(400).json({ error: 'Location does not belong to this trip' });
-      }
-    }
-
-    const insertPhoto = db.prepare(`
-      INSERT INTO photos (location_id, trip_id, filename, original_name, caption)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    const insertAll = db.transaction(() =>
-      files.map((file) =>
-        insertPhoto.run(locationId, req.params.tripId, file.filename, file.originalname, caption || '')
-      )
-    );
-
-    const results = insertAll();
-    const insertedIds = results.map((r) => r.lastInsertRowid);
-    const photos = insertedIds.map((id) =>
-      db.prepare('SELECT * FROM photos WHERE id = ?').get(id)
-    );
-
-    res.status(201).json(photos);
-  } catch (err) {
-    console.error(err);
+  const reject = (status: number, error: string) => {
     removeUploadedFiles(req);
-    res.status(500).json({ error: 'Failed to upload photos' });
+    res.status(status).json({ error });
+  };
+
+  if (!getTripRow(req.params.tripId)) return reject(404, 'Trip not found');
+
+  const files = (req.files ?? []) as Express.Multer.File[];
+  if (files.length === 0) return reject(400, 'No files uploaded');
+
+  const body = validate(photoUploadSchema, req.body, res);
+  if (!body) return removeUploadedFiles(req);
+
+  const locationId = body.location_id ?? null;
+  if (locationId && !getLocation(req.params.tripId, locationId)) {
+    return reject(400, 'Location does not belong to this trip');
+  }
+
+  const insert = db.prepare(`
+    INSERT INTO photos (location_id, trip_id, filename, original_name, caption)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  try {
+    const ids = db.transaction(() =>
+      files.map((file) =>
+        insert.run(locationId, req.params.tripId, file.filename, file.originalname, body.caption).lastInsertRowid)
+    )();
+    res.status(201).json(ids.map((id) => db.prepare('SELECT * FROM photos WHERE id = ?').get(id) as PhotoRow));
+  } catch (err) {
+    removeUploadedFiles(req);
+    throw err;
   }
 });
 
 // ─── PATCH update photo caption ───────────────────────────────────────────────
 router.patch('/:photoId', (req: Request, res: Response) => {
-  try {
-    const { caption } = req.body;
-    const photo = db.prepare('SELECT * FROM photos WHERE id = ? AND trip_id = ?')
-      .get(req.params.photoId, req.params.tripId);
+  const photo = getPhoto(req.params.tripId, req.params.photoId);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
 
-    if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  const body = validate(photoUpdateSchema, req.body, res);
+  if (!body) return;
 
-    db.prepare('UPDATE photos SET caption = ? WHERE id = ?').run(caption ?? '', req.params.photoId);
-    res.json(db.prepare('SELECT * FROM photos WHERE id = ?').get(req.params.photoId));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update photo' });
-  }
+  db.prepare('UPDATE photos SET caption = ? WHERE id = ?').run(body.caption, photo.id);
+  res.json(getPhoto(req.params.tripId, photo.id));
 });
 
 // ─── DELETE photo ─────────────────────────────────────────────────────────────
 router.delete('/:photoId', (req: Request, res: Response) => {
-  try {
-    const photo = db.prepare('SELECT * FROM photos WHERE id = ? AND trip_id = ?')
-      .get(req.params.photoId, req.params.tripId) as any;
+  const photo = getPhoto(req.params.tripId, req.params.photoId);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
 
-    if (!photo) return res.status(404).json({ error: 'Photo not found' });
-
-    // Remove file from disk
-    fs.rmSync(path.join(UPLOADS_DIR, photo.filename), { force: true });
-
-    db.prepare('DELETE FROM photos WHERE id = ?').run(req.params.photoId);
-    res.json({ message: 'Photo deleted' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete photo' });
-  }
+  db.prepare('DELETE FROM photos WHERE id = ?').run(photo.id);
+  deleteUpload(photo.filename);
+  res.json({ message: 'Photo deleted' });
 });
 
 export default router;

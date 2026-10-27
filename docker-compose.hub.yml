@@ -31,7 +31,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      CLIENT_URL: "*"
       # Optional: require a login (username/password) to use the app
       # WEB_USER: admin
       # WEB_PASSWORD: change-me

@@ -1,44 +1,52 @@
-export interface Trip {
+// Rows as stored in SQLite
+export interface TripRow {
   id: number;
   title: string;
   description: string;
   start_date: string;
   end_date: string;
-  cover_image?: string;
-  tags: string; // JSON string in DB, parsed to string[] in API response
+  cover_image: string | null;
+  cover_position_x: number;
+  cover_position_y: number;
+  tags: string; // JSON array
   created_at: string;
 }
 
-export interface Location {
+export interface LocationRow {
   id: number;
   trip_id: number;
   name: string;
   country: string;
   lat: number;
   lng: number;
-  date_start?: string;
-  date_end?: string;
-  description?: string;
-  notes?: string;
+  date_start: string | null;
+  date_end: string | null;
+  description: string;
+  notes: string;
   order_index: number;
-  rating?: number;
+  rating: number | null;
 }
 
-export interface Photo {
+export interface PhotoRow {
   id: number;
-  location_id?: number;
+  location_id: number | null;
   trip_id: number;
   filename: string;
   original_name: string;
-  caption?: string;
+  caption: string;
   created_at: string;
+}
+
+// Shapes returned by the API
+export interface Trip extends Omit<TripRow, 'tags'> {
+  tags: string[];
+}
+
+export interface LocationWithPhotos extends LocationRow {
+  photos: PhotoRow[];
 }
 
 export interface TripWithRelations extends Trip {
   locations: LocationWithPhotos[];
-  photos: Photo[];
-}
-
-export interface LocationWithPhotos extends Location {
-  photos: Photo[];
+  photos: PhotoRow[];
 }

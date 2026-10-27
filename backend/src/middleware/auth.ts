@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { DATA_DIR } from '../database/db';
+import { DATA_DIR } from '../config';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 // Login is enabled only when WEB_PASSWORD is set (same variables as the other
@@ -18,6 +18,7 @@ const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
 // Signing key persisted next to the database so sessions survive restarts.
 // Changing WEB_PASSWORD invalidates every existing session.
 function loadSecret(): Buffer {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
   const file = path.join(DATA_DIR, 'session.secret');
   let secret: string;
   if (process.env.SESSION_SECRET) {

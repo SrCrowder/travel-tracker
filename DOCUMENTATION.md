@@ -52,8 +52,9 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 | TypeScript | Type safety |
 | better-sqlite3 | SQLite database (single file, no server needed) |
 | multer | File upload handling |
-| uuid | Unique filenames for uploaded photos |
+| zod | Validation of every request body |
 | dotenv | Environment variable loading |
+| vitest + supertest | API tests (`npm test`) |
 
 ### Frontend
 | Package | Role |
@@ -101,7 +102,9 @@ travel-tracker/
 │       ├── index.ts            # Express app entry point, startup
 │       ├── database/
 │       │   ├── db.ts           # SQLite connection (better-sqlite3)
-│       │   ├── schema.ts       # Table definitions + migrations (ALTER TABLE)
+│       │   ├── migrations.ts   # Versioned schema migrations (PRAGMA user_version)
+│       │   ├── queries.ts      # Shared queries (trip + locations + photos as JSON)
+│       │   ├── index.ts        # initDatabase(): migrate, seed demo data on a new DB
 │       │   └── seed.ts         # Seeds example data if DB is empty
 │       ├── middleware/
 │       │   ├── auth.ts         # Optional login (WEB_USER / WEB_PASSWORD), session cookie
@@ -173,24 +176,27 @@ travel-tracker/
 Best for active development — hot reload on both frontend and backend.
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 22+ (the Docker images use Node 24)
 - npm
 
 ### Backend
 
 ```bash
 cd backend
-npm install
+npm ci
 npm run dev
 # API available at http://localhost:3001
 # Health check: http://localhost:3001/health
+
+npm test          # API tests (each test file uses its own temporary database)
+npm run typecheck
 ```
 
 ### Frontend (separate terminal)
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 # App available at http://localhost:5173
 ```
@@ -294,7 +300,9 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 |---|---|---|
 | `PORT` | `3001` | Port the Express server listens on |
 | `NODE_ENV` | `development` | `production` disables verbose errors |
-| `CLIENT_URL` | `http://localhost:5173` | Allowed CORS origin. Use `*` in the server compose to allow any origin |
+| `CLIENT_URL` | *(empty)* | Only if the frontend is served from **another origin** (CORS). Not needed behind the bundled nginx or the Vite dev proxy |
+| `DATA_DIR` / `UPLOADS_DIR` | `backend/data`, `backend/uploads` | Where the database and the uploaded files live (`/app/data`, `/app/uploads` in Docker) |
+| `SEED_DEMO` | `true` | Adds 3 demo trips **only when the database is created**. Set `false` to start empty |
 | `WEB_USER` | `admin` | Login username (only used when `WEB_PASSWORD` is set) |
 | `WEB_PASSWORD` | *(empty)* | Set it to require a login for the whole app (API and photos). Empty = no login, fine on a private LAN |
 | `SESSION_DAYS` | `30` | How long a login lasts |
@@ -362,14 +370,15 @@ SQLite file lives at:
 
 ### Adding a new column (migrations)
 
-The schema uses a safe migration pattern — just add to the bottom of `initializeSchema()` in `backend/src/database/schema.ts`:
+Migrations live in `backend/src/database/migrations.ts`. Each entry runs once, in order, inside a transaction, and `PRAGMA user_version` records how many have run. To change the schema, **append** a new entry (never edit one that has shipped):
 
 ```typescript
-// Safe — silently ignored if column already exists
-try { db.exec(`ALTER TABLE trips ADD COLUMN my_new_column TEXT DEFAULT ''`); } catch {}
+(db) => {
+  db.exec(`ALTER TABLE trips ADD COLUMN my_new_column TEXT DEFAULT ''`);
+},
 ```
 
-This runs on every startup and is idempotent.
+Databases created before versioning (user_version 0) are handled by migration 1, which is idempotent.
 
 ---
 
@@ -464,18 +473,22 @@ The default language is set in `frontend/src/i18n/index.ts` (`lng: 'es'`). Chang
 
 ### Adding a new field to Trip
 
-1. **DB migration** — `backend/src/database/schema.ts`:
+1. **DB migration** — append an entry to `backend/src/database/migrations.ts`:
    ```typescript
-   try { db.exec(`ALTER TABLE trips ADD COLUMN my_field TEXT DEFAULT ''`); } catch {}
+   (db) => db.exec(`ALTER TABLE trips ADD COLUMN my_field TEXT DEFAULT ''`),
    ```
 
-2. **Backend routes** — `backend/src/routes/trips.ts`: read from `req.body` in POST and PUT, add to the SQL INSERT/UPDATE.
+2. **Validation** — add the field to `tripFields` in `backend/src/validation.ts`.
 
-3. **Frontend type** — `frontend/src/types/index.ts`: add to the `Trip` interface.
+3. **Backend routes** — `backend/src/routes/trips.ts`: add it to the SQL INSERT/UPDATE, and to `TripRow` in `backend/src/types/index.ts`.
 
-4. **UI** — `frontend/src/components/AddTripModal.tsx` for editing, `frontend/src/pages/TripDetail.tsx` or `frontend/src/components/TripCard.tsx` for display.
+4. **Test** — cover it in `backend/test/api.test.ts`.
 
-5. **Translations** — add keys to both `en.json` and `es.json`.
+5. **Frontend type** — `frontend/src/types/index.ts`: add to the `Trip` interface.
+
+6. **UI** — `frontend/src/components/addTrip/TripInfoStep.tsx` for editing, `frontend/src/pages/TripDetail.tsx` or `frontend/src/components/TripCard.tsx` for display.
+
+7. **Translations** — add keys to both `en.json` and `es.json`.
 
 ### Adding a new API route
 
