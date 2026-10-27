@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Calendar, MapPin, Clock, Tag, Trash2, MoreVertical, Pencil, ImagePlus, FileDown, Loader2,
+  ArrowLeft, Calendar, MapPin, Clock, Tag, Trash2, MoreVertical, Pencil, ImagePlus, FileDown, Loader2, Images,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { tripsApi, locationsApi, getImageUrl } from '../api/client';
+import { tripsApi, locationsApi, getImageUrl, allMedia } from '../api/client';
 import Navbar from '../components/Navbar';
 import InteractiveMap from '../components/InteractiveMap';
 import LocationPanel from '../components/LocationPanel';
@@ -16,9 +16,11 @@ import Timeline from '../components/Timeline';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AddTripModal from '../components/AddTripModal';
 import PhotoUploadModal from '../components/PhotoUploadModal';
+import ImportPhotosModal from '../components/ImportPhotosModal';
+import Lightbox from '../components/Lightbox';
 import { useDateLocale } from '../i18n/useDateLocale';
 import { useTripPdfExport } from '../hooks/useTripPdfExport';
-import type { Trip, Location } from '../types';
+import type { Trip, Location, Photo } from '../types';
 
 const TAG_COLORS: Record<string, string> = {
   adventure: 'bg-orange-500/20 text-orange-200',
@@ -48,6 +50,8 @@ export default function TripDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadDefaultLocationId, setUploadDefaultLocationId] = useState<number | undefined>();
+  const [importOpen, setImportOpen] = useState(false);
+  const [mapLightbox, setMapLightbox] = useState<{ photos: Photo[]; index: number } | null>(null);
 
   const openUploadModal = (locationId?: number) => {
     setUploadDefaultLocationId(locationId);
@@ -61,6 +65,9 @@ export default function TripDetail() {
       return res.data as Trip;
     },
     enabled: !!id,
+    // Poll while a video is being converted so it appears as soon as it's ready
+    refetchInterval: (query) =>
+      query.state.data && allMedia(query.state.data).some((p) => p.status === 'processing') ? 4000 : false,
   });
 
   // When trip data refreshes after a location edit, keep selectedLocation in sync
@@ -100,6 +107,9 @@ export default function TripDetail() {
   const sortedLocations = [...(trip.locations ?? [])].sort(
     (a, b) => a.order_index - b.order_index
   );
+  const media = allMedia(trip);
+  const geotaggedMedia = media.filter((p) => p.lat != null && p.lng != null);
+  const locationName = new Map(sortedLocations.map((l) => [l.id, l.name]));
 
   const handleDeleteTrip = () => {
     if (window.confirm(t('tripDetail.deleteConfirm', { title: trip.title }))) {
@@ -152,7 +162,7 @@ export default function TripDetail() {
                 initial={{ opacity: 0, scale: 0.9, y: -4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: -4 }}
-                className="absolute right-0 mt-2 w-44 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-10"
+                className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-10"
               >
                 <button
                   onClick={() => { setMenuOpen(false); setEditModalOpen(true); }}
@@ -160,6 +170,13 @@ export default function TripDetail() {
                 >
                   <Pencil size={15} />
                   {t('tripDetail.editTrip')}
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); setImportOpen(true); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <Images size={15} />
+                  {t('tripDetail.importMedia')}
                 </button>
                 <button
                   onClick={() => { setMenuOpen(false); exportPdf(trip); }}
@@ -265,13 +282,9 @@ export default function TripDetail() {
                 />
               )}
               <span className="relative z-10">{t(`tripDetail.tabs.${tabId}`)}</span>
-              {tabId === 'photos' && (() => {
-                const count = (trip.photos?.length ?? 0) +
-                  (trip.locations?.reduce((s, l) => s + (l.photos?.length ?? 0), 0) ?? 0);
-                return count > 0 ? (
-                  <span className="relative z-10 ml-1.5 text-xs opacity-70">({count})</span>
-                ) : null;
-              })()}
+              {tabId === 'photos' && media.length > 0 && (
+                <span className="relative z-10 ml-1.5 text-xs opacity-70">({media.length})</span>
+              )}
             </button>
           ))}
         </div>
@@ -296,6 +309,10 @@ export default function TripDetail() {
                   selectedLocation={selectedLocation}
                   onLocationSelect={(loc) =>
                     setSelectedLocation((prev) => (prev?.id === loc.id ? null : loc))
+                  }
+                  media={geotaggedMedia}
+                  onMediaClick={(photo) =>
+                    setMapLightbox({ photos: geotaggedMedia, index: geotaggedMedia.findIndex((p) => p.id === photo.id) })
                   }
                 />
               </div>
@@ -420,6 +437,21 @@ export default function TripDetail() {
           qc.invalidateQueries({ queryKey: ['trips'] });
         }}
       />
+
+      {/* Bulk import of photos/videos into this trip */}
+      <ImportPhotosModal isOpen={importOpen} onClose={() => setImportOpen(false)} defaultTripId={trip.id} />
+
+      {/* Photo/video opened from the map */}
+      <AnimatePresence>
+        {mapLightbox && (
+          <Lightbox
+            photos={mapLightbox.photos}
+            startIndex={mapLightbox.index}
+            onClose={() => setMapLightbox(null)}
+            placeName={(p) => (p.location_id ? locationName.get(p.location_id) : undefined)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Photo upload modal — opened from Photos tab or Location panel */}
       <PhotoUploadModal

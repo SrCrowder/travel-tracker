@@ -233,3 +233,64 @@
   transform: scale(1.2);
   box-shadow: 0 5px 20px rgba(245, 158, 11, 0.5);
 }
+
+/* ── Photo / video markers on the trip map ─────────────────────────────── */
+.media-marker {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 2.5px solid white;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  background: #cbd5e1;
+  transition: transform 0.15s ease;
+}
+
+.media-marker:hover {
+  transform: scale(1.12);
+}
+
+.media-marker img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-marker .media-marker-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 13px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.media-cluster {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2.5px solid white;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.media-cluster span {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 11px;
+  background: #4F46E5;
+  color: white;
+  font: 700 11px/22px 'Inter', sans-serif;
+  text-align: center;
+  border: 2px solid white;
+}

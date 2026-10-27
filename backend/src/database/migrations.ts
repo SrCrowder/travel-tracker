@@ -59,6 +59,27 @@ const migrations: Array<(db: Database) => void> = [
     if (!hasColumn(db, 'trips', 'cover_position_x')) db.exec('ALTER TABLE trips ADD COLUMN cover_position_x REAL DEFAULT 50');
     if (!hasColumn(db, 'trips', 'cover_position_y')) db.exec('ALTER TABLE trips ADD COLUMN cover_position_y REAL DEFAULT 50');
   },
+
+  // 2 — photos become "media": metadata from EXIF / video tags, thumbnails,
+  //     an untouched original next to the browser-friendly copy, and videos
+  //     (converted in the background: status processing → ready / failed).
+  (db) => {
+    db.exec(`
+      ALTER TABLE photos ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image';
+      ALTER TABLE photos ADD COLUMN status TEXT NOT NULL DEFAULT 'ready';
+      ALTER TABLE photos ADD COLUMN original_filename TEXT;
+      ALTER TABLE photos ADD COLUMN thumb_filename TEXT;
+      ALTER TABLE photos ADD COLUMN taken_at TEXT;
+      ALTER TABLE photos ADD COLUMN taken_offset TEXT;
+      ALTER TABLE photos ADD COLUMN lat REAL;
+      ALTER TABLE photos ADD COLUMN lng REAL;
+      ALTER TABLE photos ADD COLUMN camera TEXT;
+      ALTER TABLE photos ADD COLUMN width INTEGER;
+      ALTER TABLE photos ADD COLUMN height INTEGER;
+      ALTER TABLE photos ADD COLUMN duration REAL;
+      CREATE INDEX IF NOT EXISTS idx_photos_taken_at ON photos(trip_id, taken_at);
+    `);
+  },
 ];
 
 export const SCHEMA_VERSION = migrations.length;

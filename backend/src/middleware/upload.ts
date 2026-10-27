@@ -3,63 +3,30 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
-import { UPLOADS_DIR } from '../config';
+import { MAX_IMAGE_MB, MAX_VIDEO_MB, UPLOADS_DIR } from '../config';
+import { detectMedia, readHeader, type DetectedMedia, type MediaKind } from '../services/media';
+import { videoSupport } from '../services/videos';
 
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// The stored extension comes from this allowlist, never from the client's
-// filename, so an upload can't end up served as .html/.svg/.js.
-const EXTENSIONS: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/jpg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-};
-
+// Files land with a neutral ".upload" name; verifyMedia() renames them once
+// their real type is known, so the extension never comes from the client.
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (_req, file, cb) => {
-    cb(null, `${crypto.randomUUID()}${EXTENSIONS[file.mimetype]}`);
-  },
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}.upload`),
 });
-
-const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (EXTENSIONS[file.mimetype]) {
-    cb(null, true);
-  } else {
-    cb(Object.assign(new Error('Only image files (jpg, png, webp, gif) are allowed'), { status: 400 }));
-  }
-};
 
 const upload = multer({
   storage,
-  fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB per file
-    files: 20,                   // max 20 files per request
+    fileSize: MAX_VIDEO_MB * 1024 * 1024, // images get a lower limit in verifyMedia
+    files: 50,
   },
 });
 
-// ─── Content check: the file's magic bytes must match its extension ──────────
-function detectImageExt(file: string): string | null {
-  const fd = fs.openSync(file, 'r');
-  const buf = Buffer.alloc(12);
-  try {
-    fs.readSync(fd, buf, 0, 12, 0);
-  } finally {
-    fs.closeSync(fd);
-  }
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return '.jpg';
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return '.png';
-  if (buf.toString('ascii', 0, 4) === 'GIF8') return '.gif';
-  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return '.webp';
-  return null;
-}
+export type VerifiedFile = Express.Multer.File & { media: DetectedMedia };
 
-function uploadedFiles(req: Request): Express.Multer.File[] {
+export function uploadedFiles(req: Request): Express.Multer.File[] {
   if (req.file) return [req.file];
   if (Array.isArray(req.files)) return req.files;
   return [];
@@ -72,26 +39,59 @@ export function removeUploadedFiles(req: Request): void {
   }
 }
 
-// Runs after multer: rejects the whole request if any file isn't a real image.
-export function verifyImages(req: Request, res: Response, next: NextFunction) {
-  const bad = uploadedFiles(req).some((file) => detectImageExt(file.path) !== path.extname(file.filename));
-  if (!bad) return next();
-  removeUploadedFiles(req);
-  res.status(400).json({ error: 'Only image files (jpg, png, webp, gif) are allowed' });
+const KIND_ERROR: Record<string, string> = {
+  image: 'Only image files (jpg, png, webp, gif, avif, heic, tiff) are allowed',
+  'image,video': 'Only photos (jpg, png, webp, gif, avif, heic, tiff) and videos (mov, mp4, webm) are allowed',
+};
+
+/**
+ * Runs after multer: checks each file's bytes, rejects the whole request if
+ * any isn't an allowed photo/video, and renames the files to "<uuid>.<ext>".
+ */
+export function verifyMedia(allowed: MediaKind[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const reject = (error: string) => {
+      removeUploadedFiles(req);
+      res.status(400).json({ error });
+    };
+
+    try {
+      const files = uploadedFiles(req);
+      const detected = files.map((file) => detectMedia(readHeader(file.path)));
+      if (detected.some((m) => !m || !allowed.includes(m.kind))) return reject(KIND_ERROR[allowed.join(',')]);
+      if (files.some((file, i) => detected[i]!.kind === 'image' && file.size > MAX_IMAGE_MB * 1024 * 1024)) {
+        return reject(`Photos can be at most ${MAX_IMAGE_MB} MB`);
+      }
+      if (detected.some((m) => m!.kind === 'video') && !(await videoSupport())) {
+        return reject('Video support is not available on this server (ffmpeg is missing)');
+      }
+
+      files.forEach((file, i) => {
+        const name = `${path.parse(file.filename).name}.${detected[i]!.format}`;
+        const target = path.join(UPLOADS_DIR, name);
+        fs.renameSync(file.path, target);
+        Object.assign(file, { filename: name, path: target, media: detected[i] });
+      });
+      next();
+    } catch (err) {
+      removeUploadedFiles(req);
+      next(err);
+    }
+  };
 }
 
-/** Deletes a stored upload; ignores missing files and names with a path in them. */
-export function deleteUpload(filename: string | null | undefined): void {
-  if (!filename || filename !== path.basename(filename)) return;
-  fs.rmSync(path.join(UPLOADS_DIR, filename), { force: true });
-}
+const CONTENT_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif',
+  '.heic': 'image/heic', '.tiff': 'image/tiff', '.mov': 'video/quicktime', '.mp4': 'video/mp4', '.webm': 'video/webm',
+};
 
 // Headers for serving /uploads: never sniff or run the content as a page.
-export function uploadHeaders(res: Response): void {
+export function uploadHeaders(res: Response, filePath: string): void {
+  res.setHeader('Content-Type', CONTENT_TYPES[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; sandbox");
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; sandbox");
   res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
 }
 
+export { deleteUpload } from '../services/storage';
 export default upload;
-export { UPLOADS_DIR };

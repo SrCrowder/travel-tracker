@@ -13,3 +13,11 @@ export const CLIENT_URL = process.env.CLIENT_URL && process.env.CLIENT_URL !== '
 
 // Demo trips are added once, when the database is created. SEED_DEMO=false skips them.
 export const SEED_DEMO = process.env.SEED_DEMO !== 'false';
+
+// Video support needs ffmpeg + ffprobe (bundled in the Docker image)
+export const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
+export const FFPROBE_PATH = process.env.FFPROBE_PATH || 'ffprobe';
+
+// Per-file upload limits
+export const MAX_IMAGE_MB = Number(process.env.MAX_IMAGE_MB) || 50;
+export const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB) || 4096;

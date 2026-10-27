@@ -27,13 +27,26 @@ export interface LocationRow {
   rating: number | null;
 }
 
+/** A photo or a video (media_type). */
 export interface PhotoRow {
   id: number;
   location_id: number | null;
   trip_id: number;
-  filename: string;
-  original_name: string;
+  media_type: 'image' | 'video';
+  status: 'ready' | 'processing' | 'failed';
+  filename: string;                 // browser-friendly file (JPEG/MP4 copy if the original isn't)
+  original_filename: string | null; // untouched upload when it differs from filename (HEIC, MOV…)
+  thumb_filename: string | null;
+  original_name: string;            // name of the file on the user's device
   caption: string;
+  taken_at: string | null;          // local time from EXIF / video tags
+  taken_offset: string | null;
+  lat: number | null;
+  lng: number | null;
+  camera: string | null;
+  width: number | null;
+  height: number | null;
+  duration: number | null;          // seconds (videos)
   created_at: string;
 }
 

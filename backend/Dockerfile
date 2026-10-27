@@ -26,7 +26,8 @@ RUN npm run build
 FROM node:24-alpine
 
 # su-exec: the entrypoint fixes volume ownership as root, then drops to "node"
-RUN apk add --no-cache su-exec
+# ffmpeg/ffprobe: video metadata, posters and conversion of iPhone .mov (HEVC) to MP4
+RUN apk add --no-cache su-exec ffmpeg
 
 WORKDIR /app
 

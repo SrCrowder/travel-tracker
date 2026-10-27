@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Compass, X, LogOut } from 'lucide-react';
+import { Search, Plus, Compass, X, LogOut, Images } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi, type AuthStatus } from '../api/client';
@@ -12,9 +12,11 @@ import type { Language } from '../store/useStore';
 
 interface NavbarProps {
   onAddTrip?: () => void;
+  /** Bulk import of photos/videos */
+  onImport?: () => void;
 }
 
-export default function Navbar({ onAddTrip }: NavbarProps) {
+export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
   const { searchQuery, setSearchQuery, language, setLanguage } = useStore();
   const { t } = useTranslation();
   const [searchFocused, setSearchFocused] = useState(false);
@@ -133,6 +135,17 @@ export default function Navbar({ onAddTrip }: NavbarProps) {
                 className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
                 <LogOut size={18} />
+              </button>
+            )}
+
+            {onImport && (
+              <button
+                onClick={onImport}
+                title={t('nav.import')}
+                className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
+              >
+                <Images size={16} />
+                <span className="hidden md:block">{t('nav.import')}</span>
               </button>
             )}
 

@@ -43,6 +43,9 @@ jobs:
             backend/package-lock.json
             frontend/package-lock.json
 
+      - name: ffmpeg (tests de vídeo)
+        run: command -v ffprobe || (sudo apt-get update -q && sudo apt-get install -yq ffmpeg)
+
       - name: Backend — tests
         working-directory: backend
         run: |

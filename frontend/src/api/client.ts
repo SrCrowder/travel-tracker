@@ -79,6 +79,7 @@ export const photosApi = {
     if (caption) formData.append('caption', caption);
     return api.post<Photo[]>(`/trips/${tripId}/photos`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0, // big videos can take a while to upload
     });
   },
 
@@ -99,8 +100,22 @@ export const geocode = async (query: string) => {
   return res.json();
 };
 
-// ─── Image URL helper ─────────────────────────────────────────────────────────
+// ─── Image URL helpers ────────────────────────────────────────────────────────
 export const getImageUrl = (filename: string): string => {
   const base = import.meta.env.VITE_API_URL || '';
   return `${base}/uploads/${filename}`;
 };
+
+/** Small preview (poster frame for videos); falls back to the full image. */
+export const thumbUrl = (photo: Photo): string => getImageUrl(photo.thumb_filename ?? photo.filename);
+
+/** The file to show/play in the browser. */
+export const mediaUrl = (photo: Photo): string => getImageUrl(photo.filename);
+
+/** The file exactly as it was uploaded (HEIC, MOV…). */
+export const originalUrl = (photo: Photo): string => getImageUrl(photo.original_filename ?? photo.filename);
+
+/** Every photo/video of a trip: general ones plus each location's, in time order. */
+export const allMedia = (trip: Trip): Photo[] =>
+  [...(trip.photos ?? []), ...(trip.locations ?? []).flatMap((l) => l.photos ?? [])]
+    .sort((a, b) => (a.taken_at ?? a.created_at).localeCompare(b.taken_at ?? b.created_at) || a.id - b.id);

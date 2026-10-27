@@ -9,6 +9,7 @@ import TripCalendar from '../components/TripCalendar';
 import StatsSection from '../components/StatsSection';
 import FilterBar from '../components/FilterBar';
 import AddTripModal from '../components/AddTripModal';
+import ImportPhotosModal from '../components/ImportPhotosModal';
 import EmptyState from '../components/EmptyState';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Navbar from '../components/Navbar';
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const { searchQuery, selectedYear, selectedTags } = useStore();
   const { t } = useTranslation();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const { data: trips = [], isLoading, refetch } = useQuery({
     queryKey: ['trips'],
@@ -64,14 +66,14 @@ export default function Dashboard() {
 
   if (isLoading) return (
     <>
-      <Navbar onAddTrip={() => setIsAddModalOpen(true)} />
+      <Navbar onAddTrip={() => setIsAddModalOpen(true)} onImport={() => setIsImportOpen(true)} />
       <LoadingSpinner message={t('dashboard.loading')} />
     </>
   );
 
   return (
     <>
-      <Navbar onAddTrip={() => setIsAddModalOpen(true)} />
+      <Navbar onAddTrip={() => setIsAddModalOpen(true)} onImport={() => setIsImportOpen(true)} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
@@ -128,6 +130,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <ImportPhotosModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
 
       <AddTripModal
         isOpen={isAddModalOpen}

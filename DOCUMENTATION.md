@@ -30,8 +30,10 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 | Cover photo reposition | Drag to set the focal point of the cover image (shown in cards and hero) |
 | Locations | Add locations to a trip with coordinates, dates, star rating, description, private notes |
 | Interactive map | react-leaflet map with numbered markers; toggle between straight-line and road routing (OSRM) |
-| Timeline view | Day-by-day breakdown of each trip with photos |
-| Photo gallery | Upload, view in lightbox, and delete photos; attach to a location or the trip generally |
+| Timeline view | Day-by-day breakdown of each trip, with the photos/videos taken each day |
+| Photos & videos | Upload, view in lightbox, play, download the original, delete; attach to a location or the trip generally. Photos: JPG, PNG, GIF, WebP, AVIF, **HEIC** (iPhone), TIFF. Videos: **MOV** (iPhone), MP4, WebM |
+| Bulk import | Drop many photos and videos at once: their date and GPS are read in the browser, shown on a map, grouped into places (named with OpenStreetMap) and imported into a new or an existing trip |
+| Media on the map | Geotagged photos/videos appear on the trip map as thumbnails (grouped when zoomed out); click to open/play |
 | Travel calendar | Calendar view highlighting days with active trips |
 | Stats bar | Totals: adventures, countries, days travelled, locations |
 | Search | Command-palette style search (⌘K / Ctrl+K) across all trips and locations |
@@ -177,6 +179,7 @@ Best for active development — hot reload on both frontend and backend.
 
 ### Prerequisites
 - Node.js 22+ (the Docker images use Node 24)
+- `ffmpeg` / `ffprobe` on the PATH for video uploads and the video tests
 - npm
 
 ### Backend
@@ -302,6 +305,8 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 | `NODE_ENV` | `development` | `production` disables verbose errors |
 | `CLIENT_URL` | *(empty)* | Only if the frontend is served from **another origin** (CORS). Not needed behind the bundled nginx or the Vite dev proxy |
 | `DATA_DIR` / `UPLOADS_DIR` | `backend/data`, `backend/uploads` | Where the database and the uploaded files live (`/app/data`, `/app/uploads` in Docker) |
+| `MAX_IMAGE_MB` / `MAX_VIDEO_MB` | `50` / `4096` | Largest photo / video accepted |
+| `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Needed for videos (included in the Docker image). Without them video uploads are refused |
 | `SEED_DEMO` | `true` | Adds 3 demo trips **only when the database is created**. Set `false` to start empty |
 | `WEB_USER` | `admin` | Login username (only used when `WEB_PASSWORD` is set) |
 | `WEB_PASSWORD` | *(empty)* | Set it to require a login for the whole app (API and photos). Empty = no login, fine on a private LAN |
@@ -363,10 +368,25 @@ SQLite file lives at:
 | `id` | INTEGER PK | |
 | `trip_id` | INTEGER FK | Cascade deletes with trip |
 | `location_id` | INTEGER FK | NULL = general trip photo |
-| `filename` | TEXT | UUID filename stored in uploads dir |
+| `media_type` | TEXT | `image` or `video` |
+| `status` | TEXT | `ready`, or for videos being converted `processing` → `ready` / `failed` |
+| `filename` | TEXT | Browser-friendly file: the upload itself, or a JPEG (HEIC/TIFF) / H.264 MP4 (MOV, HEVC…) copy |
+| `original_filename` | TEXT | The untouched upload when it differs from `filename` (never modified, metadata included) |
+| `thumb_filename` | TEXT | 480 px WebP thumbnail (poster frame for videos) |
 | `original_name` | TEXT | Original file name from upload |
 | `caption` | TEXT | Optional |
-| `created_at` | TEXT | |
+| `taken_at` / `taken_offset` | TEXT | Local date-time it was taken (EXIF / QuickTime tags) and its UTC offset |
+| `lat` / `lng` | REAL | GPS position, if the file has one |
+| `camera` | TEXT | e.g. `Apple iPhone 15` |
+| `width` / `height` / `duration` | | Pixels (after rotation) and seconds (videos) |
+| `created_at` | TEXT | Upload time |
+
+#### How uploads are processed
+
+1. The type is detected from the file's **bytes** (never its name or MIME type); anything else is rejected with `400`.
+2. Photos: EXIF is read (`exifr`), a thumbnail is made (`sharp`), and HEIC/TIFF get a JPEG copy for the browser (HEIC is decoded with `heic-decode`, since `sharp`'s libvips has no HEVC decoder).
+3. Videos: `ffprobe` reads date, GPS and camera (`com.apple.quicktime.*` tags), `ffmpeg` grabs a poster frame. H.264 videos are remuxed to MP4 (no quality loss); anything else (iPhone HEVC, 10-bit HDR…) is re-encoded to H.264 1080p **in the background** — the upload answers at once with `status: processing` and the trip page refreshes until it's ready. Interrupted conversions resume on restart.
+4. Photos uploaded before this existed get thumbnails and EXIF data in the background on startup.
 
 ### Adding a new column (migrations)
 
@@ -433,7 +453,7 @@ When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/up
 | DELETE | `/api/trips/:tripId/photos/:id` | — | Delete photo (removes file from disk) |
 
 **Upload form fields:**
-- `photos` (one or more files: jpg, png, webp or gif, max 10 MB each, 20 per request. The stored extension comes from the detected type and the file content is checked, so non-images are rejected with `400`)
+- `photos` (one or more files, up to 50 per request: photos — jpg, png, gif, webp, avif, heic, tiff, max 50 MB — and videos — mov, mp4, webm, max 4 GB. The type is detected from the content and non-media files are rejected with `400`)
 - `location_id` (number, optional — omit for general trip photo)
 - `caption` (string, optional — applied to all uploaded files)
 

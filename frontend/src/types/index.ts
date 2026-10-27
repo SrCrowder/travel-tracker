@@ -1,10 +1,28 @@
+/** A photo or a video (media_type). */
 export interface Photo {
   id: number;
   location_id?: number | null;
   trip_id: number;
+  media_type: 'image' | 'video';
+  /** Videos are converted in the background: processing → ready / failed */
+  status: 'ready' | 'processing' | 'failed';
+  /** Browser-friendly file (JPEG / MP4 copy when the original isn't) */
   filename: string;
+  /** The untouched upload (HEIC, MOV…) when it differs from filename */
+  original_filename?: string | null;
+  thumb_filename?: string | null;
   original_name: string;
   caption?: string;
+  /** Local time it was taken, "YYYY-MM-DDTHH:MM:SS" */
+  taken_at?: string | null;
+  taken_offset?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  camera?: string | null;
+  width?: number | null;
+  height?: number | null;
+  /** Seconds (videos) */
+  duration?: number | null;
   created_at: string;
 }
 

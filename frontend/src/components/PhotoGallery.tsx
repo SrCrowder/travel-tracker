@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Image, ZoomIn, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getImageUrl, photosApi } from '../api/client';
+import { photosApi } from '../api/client';
+import MediaThumb from './media/MediaThumb';
 import Lightbox from './Lightbox';
 import type { Trip, Photo } from '../types';
 
@@ -78,12 +79,7 @@ export default function PhotoGallery({ trip, onPhotoDeleted }: PhotoGalleryProps
           className="photo-grid-item aspect-square bg-slate-200 dark:bg-slate-700 relative group cursor-pointer"
           onClick={() => openLightbox(photo)}
         >
-          <img
-            src={getImageUrl(photo.filename)}
-            alt={photo.caption || ''}
-            loading="lazy"
-            className="w-full h-full object-cover"
-          />
+          <MediaThumb photo={photo} className="w-full h-full" />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
             <ZoomIn size={22} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
@@ -136,6 +132,7 @@ export default function PhotoGallery({ trip, onPhotoDeleted }: PhotoGalleryProps
             photos={allPhotos}
             startIndex={lightboxIndex}
             onClose={() => setLightboxIndex(null)}
+            placeName={(p) => allPhotos.find((x) => x.id === p.id)?.locationName}
           />
         )}
       </AnimatePresence>

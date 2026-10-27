@@ -2,7 +2,12 @@ import db from './db';
 import type { TripRow, LocationRow, PhotoRow, Trip, LocationWithPhotos, TripWithRelations } from '../types';
 
 // ─── Shared SQL fragments ─────────────────────────────────────────────────────
-const PHOTO_COLUMNS = ['id', 'location_id', 'trip_id', 'filename', 'original_name', 'caption', 'created_at'];
+const PHOTO_COLUMNS = ['id', 'location_id', 'trip_id', 'media_type', 'status', 'filename', 'original_filename',
+  'thumb_filename', 'original_name', 'caption', 'taken_at', 'taken_offset', 'lat', 'lng', 'camera', 'width', 'height',
+  'duration', 'created_at'];
+
+// Chronological: when it was taken, falling back to when it was uploaded
+export const MEDIA_ORDER = 'COALESCE(taken_at, created_at), id';
 const LOCATION_COLUMNS = ['id', 'trip_id', 'name', 'country', 'lat', 'lng', 'date_start', 'date_end',
   'description', 'notes', 'order_index', 'rating'];
 
@@ -13,7 +18,7 @@ const jsonObject = (alias: string, columns: string[]) =>
 const LOCATION_PHOTOS_JSON = `
   COALESCE((
     SELECT json_group_array(${jsonObject('p', PHOTO_COLUMNS)})
-    FROM (SELECT * FROM photos WHERE location_id = l.id ORDER BY created_at, id) p
+    FROM (SELECT * FROM photos WHERE location_id = l.id ORDER BY ${MEDIA_ORDER}) p
   ), '[]')`;
 
 // JSON array of a trip's locations, without photos (alias "t" must be the trip)
@@ -70,7 +75,7 @@ export function getTrip(id: number | string): TripWithRelations | undefined {
   const row = getTripRow(id);
   if (!row) return undefined;
   const photos = db.prepare(
-    'SELECT * FROM photos WHERE trip_id = ? AND location_id IS NULL ORDER BY created_at, id'
+    `SELECT * FROM photos WHERE trip_id = ? AND location_id IS NULL ORDER BY ${MEDIA_ORDER}`
   ).all(id) as PhotoRow[];
   return { ...toTrip(row), locations: listLocations(id), photos };
 }

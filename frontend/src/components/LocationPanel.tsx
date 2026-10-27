@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { getImageUrl, locationsApi, photosApi } from '../api/client';
+import { locationsApi, photosApi } from '../api/client';
+import MediaThumb from './media/MediaThumb';
 import Lightbox from './Lightbox';
 import { useDateLocale } from '../i18n/useDateLocale';
 import type { Location } from '../types';
@@ -136,16 +137,16 @@ export default function LocationPanel({
           </button>
 
           <AnimatePresence mode="wait">
-            <motion.img
+            <motion.div
               key={photos[photoIndex].id}
-              src={getImageUrl(photos[photoIndex].filename)}
-              alt={photos[photoIndex].caption || location.name}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="w-full h-full object-cover"
-            />
+              className="w-full h-full"
+            >
+              <MediaThumb photo={photos[photoIndex]} className="w-full h-full" />
+            </motion.div>
           </AnimatePresence>
 
           {photos.length > 1 && (
@@ -162,15 +163,21 @@ export default function LocationPanel({
               >
                 <ChevronRight size={16} />
               </button>
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-[2]">
-                {photos.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={(e) => { e.stopPropagation(); setPhotoIndex(i); }}
-                    className={`w-1.5 h-1.5 rounded-full transition-all ${i === photoIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
-                  />
-                ))}
-              </div>
+              {photos.length <= 15 ? (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-[2]">
+                  {photos.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={(e) => { e.stopPropagation(); setPhotoIndex(i); }}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${i === photoIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <span className="absolute bottom-2 right-2 z-[2] text-[10px] text-white bg-black/50 rounded px-1.5 py-0.5">
+                  {photoIndex + 1} / {photos.length}
+                </span>
+              )}
             </>
           )}
 
@@ -426,6 +433,7 @@ export default function LocationPanel({
         {lightboxOpen && photos.length > 0 && (
           <Lightbox
             photos={photos}
+            placeName={() => location.name}
             startIndex={Math.min(photoIndex, photos.length - 1)}
             onClose={() => setLightboxOpen(false)}
           />

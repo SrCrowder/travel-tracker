@@ -1,10 +1,37 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
-import { X, Upload, Loader2, ImagePlus } from 'lucide-react';
+import { X, Upload, Loader2, ImagePlus, Film, FileImage } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { photosApi } from '../api/client';
+import { MEDIA_ACCEPT, MAX_VIDEO_SIZE, isVideoFile, mediaSizeValidator } from '../lib/photoImport';
 import type { Location } from '../types';
+
+const PHOTO_BATCH = 4;
+
+// Browsers can preview these directly; HEIC/TIFF get an icon instead
+const PREVIEWABLE = /\.(jpe?g|png|gif|webp|avif)$/i;
+
+function FilePreview({ file }: { file: File }) {
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  if (isVideoFile(file)) {
+    return (
+      <div className="relative w-full h-full">
+        <video src={url} muted preload="metadata" className="w-full h-full object-cover" />
+        <Film size={14} className="absolute bottom-1 left-1 text-white drop-shadow" />
+      </div>
+    );
+  }
+  if (PREVIEWABLE.test(file.name)) return <img src={url} alt="" className="w-full h-full object-cover" />;
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400 p-1">
+      <FileImage size={18} />
+      <span className="text-[9px] truncate max-w-full">{file.name}</span>
+    </div>
+  );
+}
 
 interface PhotoUploadModalProps {
   isOpen: boolean;
@@ -24,6 +51,7 @@ export default function PhotoUploadModal({
   const [locationId, setLocationId] = useState<number | ''>(defaultLocationId ?? '');
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(0);
   const [error, setError] = useState('');
 
   const onDrop = useCallback((accepted: File[]) => {
@@ -32,8 +60,9 @@ export default function PhotoUploadModal({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'] },
-    maxSize: 10 * 1024 * 1024,
+    accept: MEDIA_ACCEPT,
+    maxSize: MAX_VIDEO_SIZE,
+    validator: mediaSizeValidator,
   });
 
   const removeFile = (i: number) =>
@@ -42,14 +71,19 @@ export default function PhotoUploadModal({
   const handleUpload = async () => {
     if (files.length === 0) { setError(t('uploadPhotos.errors.noFile')); return; }
     setUploading(true);
+    setUploaded(0);
     setError('');
     try {
-      await photosApi.upload(
-        tripId,
-        files,
-        locationId !== '' ? Number(locationId) : undefined,
-        caption || undefined,
-      );
+      // Videos one per request, photos a few at a time
+      const batches = files.filter(isVideoFile).map((f) => [f]);
+      const photos = files.filter((f) => !isVideoFile(f));
+      for (let i = 0; i < photos.length; i += PHOTO_BATCH) batches.push(photos.slice(i, i + PHOTO_BATCH));
+      let done = 0;
+      for (const batch of batches) {
+        await photosApi.upload(tripId, batch, locationId !== '' ? Number(locationId) : undefined, caption || undefined);
+        done += batch.length;
+        setUploaded(done);
+      }
       onSuccess();
       handleClose();
     } catch {
@@ -126,17 +160,13 @@ export default function PhotoUploadModal({
 
             {/* File previews */}
             {files.length > 0 && (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
                 {files.map((file, i) => (
                   <div
-                    key={i}
+                    key={`${file.name}-${file.size}-${i}`}
                     className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 group"
                   >
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                    <FilePreview file={file} />
                     <button
                       onClick={() => removeFile(i)}
                       className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
@@ -217,7 +247,7 @@ export default function PhotoUploadModal({
                 className="flex items-center gap-2 px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
               >
                 {uploading ? (
-                  <><Loader2 size={15} className="animate-spin" /> {t('common.uploading')}</>
+                  <><Loader2 size={15} className="animate-spin" /> {t('common.uploading')} {uploaded}/{files.length}</>
                 ) : (
                   <>
                     <Upload size={15} />

@@ -25,11 +25,14 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^\/uploads\//,
+            // Photos and thumbnails only: videos are streamed with Range
+            // requests and would fill the cache
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/uploads/') && /\.(jpe?g|png|gif|webp|avif)$/i.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'uploads-cache',
-              expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              expiration: { maxEntries: 1000, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
           },
         ],

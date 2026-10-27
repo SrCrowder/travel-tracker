@@ -8,12 +8,14 @@
     "clear": "borrar",
     "loading": "Cargando…",
     "uploading": "Subiendo…",
-    "new": "nuevo"
+    "new": "nuevo",
+    "close": "Cerrar"
   },
   "nav": {
     "title": "Mi Diario de Viajes",
     "searchPlaceholder": "Buscar viajes, lugares… (⌘K)",
-    "newTrip": "Nuevo viaje"
+    "newTrip": "Nuevo viaje",
+    "import": "Importar fotos"
   },
   "darkMode": {
     "toLight": "Cambiar a modo claro",
@@ -58,7 +60,9 @@
   },
   "map": {
     "straightLine": "Línea recta",
-    "roads": "Carreteras"
+    "roads": "Carreteras",
+    "photos_one": "{{count}} foto",
+    "photos_other": "{{count}} fotos/vídeos"
   },
   "calendar": {
     "title": "Calendario de viajes",
@@ -84,9 +88,10 @@
       "title": "Ubicaciones",
       "empty": "Aún no hay ubicaciones."
     },
-    "uploadPhotos": "Subir fotos",
+    "uploadPhotos": "Subir fotos o vídeos",
     "exportPdf": "Exportar PDF",
-    "exportingPdf": "Exportando…"
+    "exportingPdf": "Exportando…",
+    "importMedia": "Importar fotos y vídeos"
   },
   "pdf": {
     "locations": "Ubicaciones",
@@ -121,12 +126,13 @@
     "departure": "Salida",
     "return": "Regreso",
     "travelDay": "Día de tránsito",
-    "photos_one": "📷 {{count}} foto — clic para ver",
-    "photos_other": "📷 {{count}} fotos — clic para ver"
+    "photos_one": "📷 {{count}} foto/vídeo — clic para ver",
+    "photos_other": "📷 {{count}} fotos y vídeos — clic para ver",
+    "before": "Antes"
   },
   "photoGallery": {
     "generalPhotos": "Fotos generales",
-    "noPhotos": "Aún no hay fotos para este viaje.",
+    "noPhotos": "Aún no hay fotos ni vídeos en este viaje.",
     "deletePhoto": "Eliminar foto",
     "deleteConfirm": "¿Eliminar esta foto? Esta acción no se puede deshacer."
   },
@@ -178,10 +184,10 @@
     "saveTrip": "Guardar viaje"
   },
   "uploadPhotos": {
-    "title": "Subir fotos",
+    "title": "Subir fotos o vídeos",
     "dropIdle": "Arrastra fotos o haz clic para explorar",
     "dropActive": "Suelta las fotos aquí…",
-    "dropHint": "JPG, PNG, WebP, GIF — máx. 10 MB por foto",
+    "dropHint": "Fotos (JPG, PNG, HEIC, WebP, AVIF…) y vídeos (MOV, MP4, WebM)",
     "attachLabel": "Asociar a ubicación",
     "generalOption": "Foto general del viaje (solo en la pestaña Fotos)",
     "locationHint": "Las fotos de ubicación aparecen en el <strong>mapa</strong> y la <strong>cronología</strong>. Las fotos generales solo aparecen en la pestaña <strong>Fotos</strong>.",
@@ -209,5 +215,53 @@
     "tooMany": "Demasiados intentos fallidos. Inténtalo más tarde.",
     "error": "No se pudo iniciar sesión",
     "logout": "Cerrar sesión"
+  },
+  "media": {
+    "processing": "Procesando…",
+    "processingLong": "Preparando el vídeo para el navegador…",
+    "failed": "Error",
+    "failedLong": "No se pudo convertir este vídeo. Puedes descargar el original.",
+    "downloadOriginal": "Descargar original"
+  },
+  "importPhotos": {
+    "title": "Importar fotos y vídeos",
+    "subtitle": "Usa la fecha y la ubicación de cada archivo para crear la ruta y la timeline",
+    "drop": "Arrastra aquí tus fotos y vídeos, o haz clic para elegirlos",
+    "formats": "HEIC, JPG, PNG, WebP, AVIF, TIFF · MOV, MP4, WebM — los vídeos se convierten si el navegador no puede reproducirlos",
+    "rejected_one": "{{count}} archivo no es compatible o es demasiado grande",
+    "rejected_other": "{{count}} archivos no son compatibles o son demasiado grandes",
+    "reading": "Leyendo metadatos… {{done}}",
+    "stats": {
+      "photos": "fotos",
+      "videos": "vídeos",
+      "withGps": "con ubicación",
+      "dates": "fechas"
+    },
+    "destination": "¿Dónde los añadimos?",
+    "newTrip": "Viaje nuevo",
+    "existingTrip": "Viaje existente",
+    "pickTrip": "Elige un viaje…",
+    "extendDates": "Si hay fotos fuera de sus fechas, el viaje se amplía para incluirlas.",
+    "suggestedTitle": "Viaje a {{place}}",
+    "autoPlaces_one": "Crear {{count}} lugar a partir de la ubicación de las fotos",
+    "autoPlaces_other": "Crear {{count}} lugares a partir de la ubicación de las fotos",
+    "naming": "Buscando nombre…",
+    "unplaced_one": "{{count}} archivo sin ubicación irá a las fotos generales del viaje",
+    "unplaced_other": "{{count}} archivos sin ubicación irán a las fotos generales del viaje",
+    "import_one": "Importar {{count}} archivo",
+    "import_other": "Importar {{count}} archivos",
+    "pickOther": "Elegir otros archivos",
+    "uploading": "Subiendo {{done}} de {{total}}…",
+    "keepOpen": "No cierres esta ventana. Los vídeos se convierten después, en segundo plano.",
+    "done_one": "¡Listo! Se ha importado {{count}} archivo.",
+    "done_other": "¡Listo! Se han importado {{count}} archivos.",
+    "failed_one": "{{count}} archivo no se pudo subir:",
+    "failed_other": "{{count}} archivos no se pudieron subir:",
+    "openTrip": "Ver el viaje",
+    "errors": {
+      "titleDates": "Pon un título y las fechas del viaje.",
+      "pickTrip": "Elige el viaje al que añadirlos.",
+      "failed": "No se pudo crear o actualizar el viaje. Inténtalo de nuevo."
+    }
   }
 }

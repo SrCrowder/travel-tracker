@@ -9,13 +9,15 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Images } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { Location } from '../types';
+import { thumbUrl } from '../api/client';
+import type { Location, Photo } from '../types';
 
 // Fix Leaflet's broken default icon paths in Vite/webpack
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -35,19 +37,41 @@ function createPinIcon(index: number, isSelected: boolean): L.DivIcon {
   });
 }
 
-// Fits the map to the location bounds whenever locations change
-function AutoBounds({ locations }: { locations: Location[] }) {
+function createMediaIcon(photo: Photo): L.DivIcon {
+  const play = photo.media_type === 'video' ? '<div class="media-marker-play">▶</div>' : '';
+  return L.divIcon({
+    className: '',
+    html: `<div class="media-marker"><img src="${thumbUrl(photo)}" alt="" loading="lazy" />${play}</div>`,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+  });
+}
+
+// Groups nearby photos: the newest thumbnail with the number of items
+function createClusterIcon(cluster: { getChildCount(): number; getAllChildMarkers(): L.Marker[] }): L.DivIcon {
+  const first = cluster.getAllChildMarkers()[0]?.options as { photoThumb?: string } | undefined;
+  return L.divIcon({
+    className: '',
+    html: `<div class="media-cluster" style="background-image:url('${first?.photoThumb ?? ''}')"><span>${cluster.getChildCount()}</span></div>`,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  });
+}
+
+// Fits the map to the points whenever they change
+function AutoBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
+  const key = points.map((p) => p.join(',')).join('|');
 
   useEffect(() => {
-    if (locations.length === 0) return;
-    if (locations.length === 1) {
-      map.setView([locations[0].lat, locations[0].lng], 10, { animate: true });
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], 10, { animate: true });
       return;
     }
-    const bounds = L.latLngBounds(locations.map((l) => [l.lat, l.lng]));
-    map.fitBounds(bounds, { padding: [60, 60], animate: true });
-  }, [locations, map]);
+    map.fitBounds(L.latLngBounds(points), { padding: [60, 60], animate: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
 
   return null;
 }
@@ -58,6 +82,9 @@ interface InteractiveMapProps {
   locations: Location[];
   selectedLocation: Location | null;
   onLocationSelect: (location: Location) => void;
+  /** Photos/videos with GPS are shown as thumbnails; click opens them */
+  media?: Photo[];
+  onMediaClick?: (photo: Photo) => void;
   height?: string;
 }
 
@@ -65,17 +92,23 @@ export default function InteractiveMap({
   locations,
   selectedLocation,
   onLocationSelect,
+  media = [],
+  onMediaClick,
   height = '520px',
 }: InteractiveMapProps) {
   const { t } = useTranslation();
   const [routeMode, setRouteMode] = useState<RouteMode>('straight');
+  const geotagged = media.filter((p) => p.lat != null && p.lng != null);
+  const [showMedia, setShowMedia] = useState(true);
   const [roadPath, setRoadPath] = useState<[number, number][] | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
 
   const sorted = [...locations].sort((a, b) => a.order_index - b.order_index);
   const routePoints: [number, number][] = sorted.map((l) => [l.lat, l.lng]);
-  const center: [number, number] =
-    sorted.length > 0 ? [sorted[0].lat, sorted[0].lng] : [20, 0];
+  const mediaPoints: [number, number][] = geotagged.map((p) => [p.lat!, p.lng!]);
+  // Frame the route; with no locations, frame the photos instead
+  const framePoints = routePoints.length > 0 ? routePoints : showMedia ? mediaPoints : [];
+  const center: [number, number] = framePoints[0] ?? [20, 0];
 
   // Stable key — re-fetch only when coordinates actually change
   const coordsKey = routePoints.map(([lat, lng]) => `${lat},${lng}`).join('|');
@@ -120,7 +153,7 @@ export default function InteractiveMap({
     >
       <MapContainer
         center={center}
-        zoom={sorted.length === 0 ? 3 : 6}
+        zoom={framePoints.length === 0 ? 3 : 6}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
       >
@@ -192,8 +225,44 @@ export default function InteractiveMap({
           </Marker>
         ))}
 
-        <AutoBounds locations={sorted} />
+        {/* Photo / video markers */}
+        {showMedia && geotagged.length > 0 && (
+          <MarkerClusterGroup
+            chunkedLoading
+            showCoverageOnHover={false}
+            maxClusterRadius={50}
+            iconCreateFunction={createClusterIcon}
+          >
+            {geotagged.map((photo) => (
+              <Marker
+                key={`media-${photo.id}`}
+                position={[photo.lat!, photo.lng!]}
+                icon={createMediaIcon(photo)}
+                // read back by createClusterIcon
+                {...({ photoThumb: thumbUrl(photo) } as object)}
+                eventHandlers={{ click: () => onMediaClick?.(photo) }}
+              />
+            ))}
+          </MarkerClusterGroup>
+        )}
+
+        <AutoBounds points={framePoints} />
       </MapContainer>
+
+      {/* Photos layer toggle */}
+      {geotagged.length > 0 && (
+        <button
+          onClick={() => setShowMedia((v) => !v)}
+          className={`absolute top-3 left-3 z-[1000] flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl shadow-lg border transition-colors ${
+            showMedia
+              ? 'bg-primary-600 border-primary-600 text-white'
+              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+          }`}
+        >
+          <Images size={13} />
+          {t('map.photos', { count: geotagged.length })}
+        </button>
+      )}
 
       {/* Route mode toggle — only shown when there are at least 2 locations */}
       {sorted.length > 1 && (

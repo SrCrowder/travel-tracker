@@ -17,8 +17,10 @@ export function useTripPdfExport() {
       // ── 1. Collect all image filenames ────────────────────────────────────
       const filenames = new Set<string>();
       if (trip.cover_image) filenames.add(trip.cover_image);
-      trip.locations?.forEach((loc) => loc.photos?.forEach((p) => filenames.add(p.filename)));
-      trip.photos?.forEach((p) => filenames.add(p.filename));
+      // Photos only: videos are left out of the PDF
+      const isPhoto = (p: { media_type?: string }) => p.media_type !== 'video';
+      trip.locations?.forEach((loc) => loc.photos?.filter(isPhoto).forEach((p) => filenames.add(p.filename)));
+      trip.photos?.filter(isPhoto).forEach((p) => filenames.add(p.filename));
 
       // ── 2. Fetch all images as base64 data URLs (parallel) ───────────────
       const imageMap: Record<string, string> = {};

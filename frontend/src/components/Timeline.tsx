@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, eachDayOfInterval } from 'date-fns';
+import { format, eachDayOfInterval, parseISO } from 'date-fns';
 import { MapPin, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useDateLocale } from '../i18n/useDateLocale';
 import Lightbox from './Lightbox';
+import MediaThumb from './media/MediaThumb';
+import { allMedia } from '../api/client';
 import type { Trip, Location, Photo } from '../types';
+
+const STRIP_MAX = 12;
 
 interface TimelineProps {
   trip: Trip;
@@ -27,11 +31,22 @@ export default function Timeline({ trip }: TimelineProps) {
   const dateLocale = useDateLocale();
 
   const locations = [...(trip.locations ?? [])].sort((a, b) => a.order_index - b.order_index);
+  const locationName = new Map(locations.map((l) => [l.id, l.name]));
 
-  const days = eachDayOfInterval({
-    start: new Date(trip.start_date),
-    end: new Date(trip.end_date),
-  });
+  // Photos/videos grouped by the day they were taken (local time)
+  const mediaByDay = new Map<string, Photo[]>();
+  for (const photo of allMedia(trip)) {
+    const day = photo.taken_at?.slice(0, 10);
+    if (!day) continue;
+    mediaByDay.set(day, [...(mediaByDay.get(day) ?? []), photo]);
+  }
+  const mediaDays = [...mediaByDay.keys()].sort();
+
+  // The trip's days, stretched if some photos fall outside them
+  const first = [trip.start_date, mediaDays[0]].filter(Boolean).sort()[0];
+  const last = [trip.end_date, mediaDays[mediaDays.length - 1]].filter(Boolean).sort().pop()!;
+  const days = eachDayOfInterval({ start: parseISO(first), end: parseISO(last) });
+  const tripStart = parseISO(trip.start_date);
 
   return (
     <>
@@ -42,8 +57,11 @@ export default function Timeline({ trip }: TimelineProps) {
           <div className="space-y-1">
             {days.map((day, dayIdx) => {
               const dayLocations = getLocationsForDay(day, locations);
-              const isFirst = dayIdx === 0;
-              const isLast = dayIdx === days.length - 1;
+              const dayMedia = mediaByDay.get(format(day, 'yyyy-MM-dd')) ?? [];
+              const dayNumber = Math.round((day.getTime() - tripStart.getTime()) / 86_400_000) + 1;
+              const isFirst = format(day, 'yyyy-MM-dd') === trip.start_date;
+              const isLast = format(day, 'yyyy-MM-dd') === trip.end_date;
+              const hasContent = dayLocations.length > 0 || dayMedia.length > 0;
 
               return (
                 <motion.div
@@ -56,17 +74,17 @@ export default function Timeline({ trip }: TimelineProps) {
                   <div className="flex flex-col items-center shrink-0">
                     <div
                       className={`z-10 w-4 h-4 rounded-full border-2 mt-1.5 ${
-                        dayLocations.length > 0
+                        hasContent
                           ? 'bg-primary-500 border-primary-500 shadow-glow'
                           : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600'
                       }`}
                     />
                   </div>
 
-                  <div className={`pb-6 flex-1 ${isLast ? 'pb-0' : ''}`}>
+                  <div className={`pb-6 flex-1 min-w-0 ${dayIdx === days.length - 1 ? 'pb-0' : ''}`}>
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-xs font-bold text-primary-500 uppercase tracking-widest">
-                        {t('timeline.day', { number: dayIdx + 1 })}
+                        {dayNumber >= 1 ? t('timeline.day', { number: dayNumber }) : t('timeline.before')}
                       </span>
                       <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">
                         {format(day, 'EEEE, MMMM d', { locale: dateLocale })}
@@ -124,10 +142,29 @@ export default function Timeline({ trip }: TimelineProps) {
                           </motion.div>
                         ))}
                       </div>
-                    ) : (
+                    ) : dayMedia.length === 0 ? (
                       <p className="text-sm text-slate-400 dark:text-slate-500 italic pl-1">
                         {t('timeline.travelDay')}
                       </p>
+                    ) : null}
+
+                    {/* What was photographed / filmed that day */}
+                    {dayMedia.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {dayMedia.slice(0, STRIP_MAX).map((photo, i) => (
+                          <button key={photo.id} onClick={() => setLightbox({ photos: dayMedia, index: i })}
+                            title={photo.taken_at ? format(parseISO(photo.taken_at), 'HH:mm') : undefined}
+                            className="rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-400 transition-shadow">
+                            <MediaThumb photo={photo} compact className="w-16 h-16 sm:w-20 sm:h-20" />
+                          </button>
+                        ))}
+                        {dayMedia.length > STRIP_MAX && (
+                          <button onClick={() => setLightbox({ photos: dayMedia, index: STRIP_MAX })}
+                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-slate-100 dark:bg-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600">
+                            +{dayMedia.length - STRIP_MAX}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -143,6 +180,7 @@ export default function Timeline({ trip }: TimelineProps) {
             photos={lightbox.photos}
             startIndex={lightbox.index}
             onClose={() => setLightbox(null)}
+            placeName={(p) => (p.location_id ? locationName.get(p.location_id) : undefined)}
           />
         )}
       </AnimatePresence>

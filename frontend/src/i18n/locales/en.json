@@ -8,12 +8,14 @@
     "clear": "clear",
     "loading": "Loading…",
     "uploading": "Uploading…",
-    "new": "new"
+    "new": "new",
+    "close": "Close"
   },
   "nav": {
     "title": "My Travel Log",
     "searchPlaceholder": "Search trips, places… (⌘K)",
-    "newTrip": "New Trip"
+    "newTrip": "New Trip",
+    "import": "Import photos"
   },
   "darkMode": {
     "toLight": "Switch to light mode",
@@ -58,7 +60,9 @@
   },
   "map": {
     "straightLine": "Straight line",
-    "roads": "Roads"
+    "roads": "Roads",
+    "photos_one": "{{count}} photo",
+    "photos_other": "{{count}} photos/videos"
   },
   "calendar": {
     "title": "Travel Calendar",
@@ -84,9 +88,10 @@
       "title": "Locations",
       "empty": "No locations added yet."
     },
-    "uploadPhotos": "Upload Photos",
+    "uploadPhotos": "Upload photos or videos",
     "exportPdf": "Export PDF",
-    "exportingPdf": "Exporting…"
+    "exportingPdf": "Exporting…",
+    "importMedia": "Import photos & videos"
   },
   "pdf": {
     "locations": "Locations",
@@ -121,12 +126,13 @@
     "departure": "Departure",
     "return": "Return",
     "travelDay": "Travel day",
-    "photos_one": "📷 {{count}} photo — click to view",
-    "photos_other": "📷 {{count}} photos — click to view"
+    "photos_one": "📷 {{count}} photo/video — click to view",
+    "photos_other": "📷 {{count}} photos & videos — click to view",
+    "before": "Before"
   },
   "photoGallery": {
     "generalPhotos": "General Photos",
-    "noPhotos": "No photos uploaded yet for this trip.",
+    "noPhotos": "No photos or videos in this trip yet.",
     "deletePhoto": "Delete photo",
     "deleteConfirm": "Delete this photo? This cannot be undone."
   },
@@ -178,10 +184,10 @@
     "saveTrip": "Save Trip"
   },
   "uploadPhotos": {
-    "title": "Upload Photos",
+    "title": "Upload photos or videos",
     "dropIdle": "Drop photos or click to browse",
     "dropActive": "Drop photos here…",
-    "dropHint": "JPG, PNG, WebP, GIF — max 10 MB each",
+    "dropHint": "Photos (JPG, PNG, HEIC, WebP, AVIF…) and videos (MOV, MP4, WebM)",
     "attachLabel": "Attach to Location",
     "generalOption": "General trip photo (Photos tab only)",
     "locationHint": "Location photos appear in the <strong>map panel</strong> and <strong>timeline</strong>. General photos only appear in the <strong>Photos tab</strong>.",
@@ -209,5 +215,53 @@
     "tooMany": "Too many failed attempts. Try again later.",
     "error": "Could not sign in",
     "logout": "Sign out"
+  },
+  "media": {
+    "processing": "Processing…",
+    "processingLong": "Preparing the video for the browser…",
+    "failed": "Error",
+    "failedLong": "This video could not be converted. You can download the original.",
+    "downloadOriginal": "Download original"
+  },
+  "importPhotos": {
+    "title": "Import photos & videos",
+    "subtitle": "Uses each file's date and location to build the route and the timeline",
+    "drop": "Drop your photos and videos here, or click to choose them",
+    "formats": "HEIC, JPG, PNG, WebP, AVIF, TIFF · MOV, MP4, WebM — videos are converted if the browser can't play them",
+    "rejected_one": "{{count}} file is not supported or too large",
+    "rejected_other": "{{count}} files are not supported or too large",
+    "reading": "Reading metadata… {{done}}",
+    "stats": {
+      "photos": "photos",
+      "videos": "videos",
+      "withGps": "with location",
+      "dates": "dates"
+    },
+    "destination": "Where should they go?",
+    "newTrip": "New trip",
+    "existingTrip": "Existing trip",
+    "pickTrip": "Choose a trip…",
+    "extendDates": "If some photos fall outside its dates, the trip is extended to include them.",
+    "suggestedTitle": "Trip to {{place}}",
+    "autoPlaces_one": "Create {{count}} place from the photos' locations",
+    "autoPlaces_other": "Create {{count}} places from the photos' locations",
+    "naming": "Finding name…",
+    "unplaced_one": "{{count}} file without location goes to the trip's general photos",
+    "unplaced_other": "{{count}} files without location go to the trip's general photos",
+    "import_one": "Import {{count}} file",
+    "import_other": "Import {{count}} files",
+    "pickOther": "Choose other files",
+    "uploading": "Uploading {{done}} of {{total}}…",
+    "keepOpen": "Keep this window open. Videos are converted afterwards, in the background.",
+    "done_one": "Done! {{count}} file imported.",
+    "done_other": "Done! {{count}} files imported.",
+    "failed_one": "{{count}} file could not be uploaded:",
+    "failed_other": "{{count}} files could not be uploaded:",
+    "openTrip": "Open the trip",
+    "errors": {
+      "titleDates": "Add a title and the trip dates.",
+      "pickTrip": "Choose the trip to add them to.",
+      "failed": "Could not create or update the trip. Please try again."
+    }
   }
 }

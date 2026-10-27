@@ -1,6 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import db from '../database/db';
-import upload, { verifyImages, removeUploadedFiles, deleteUpload } from '../middleware/upload';
+import upload, { verifyMedia, removeUploadedFiles, deleteUpload, type VerifiedFile } from '../middleware/upload';
+import { processImage } from '../services/images';
+import { deleteMediaFiles } from '../services/storage';
+import type { ImageFormat } from '../services/media';
 import { getTrip, getTripRow, listTrips } from '../database/queries';
 import { tripCreateSchema, tripUpdateSchema, validate } from '../validation';
 import type { PhotoRow } from '../types';
@@ -30,6 +33,22 @@ function insertLocations(tripId: number | bigint, locations: NewLocation[], firs
   }));
 }
 
+const BROWSER_IMAGE_FORMATS = ['jpg', 'png', 'gif', 'webp', 'avif'];
+
+/**
+ * The cover is shown as-is, so formats browsers can't display (HEIC, TIFF)
+ * are replaced by their JPEG version. Returns the filename to store.
+ */
+async function prepareCover(req: Request): Promise<string | null> {
+  const file = req.file as VerifiedFile | undefined;
+  if (!file) return null;
+  if (BROWSER_IMAGE_FORMATS.includes(file.media.format)) return file.filename;
+  const image = await processImage(file.filename, file.media.format as ImageFormat);
+  deleteUpload(image.thumb_filename);
+  deleteUpload(file.filename);
+  return image.filename;
+}
+
 // Renumbers order_index 0..n-1, keeping the current order
 function compactOrder(tripId: number | string) {
   const ids = db.prepare('SELECT id FROM locations WHERE trip_id = ? ORDER BY order_index, id')
@@ -51,16 +70,18 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // ─── POST create trip (and its first locations, atomically) ─────────────────
-router.post('/', upload.single('cover_image'), verifyImages, (req: Request, res: Response) => {
+router.post('/', upload.single('cover_image'), verifyMedia(['image']), async (req: Request, res: Response, next: NextFunction) => {
   const body = validate(tripCreateSchema, req.body, res);
   if (!body) return removeUploadedFiles(req);
 
+  let cover: string | null = null;
   try {
+    cover = await prepareCover(req);
     const tripId = db.transaction(() => {
       const result = db.prepare(`
         INSERT INTO trips (title, description, start_date, end_date, cover_image, tags, cover_position_x, cover_position_y)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(body.title, body.description, body.start_date, body.end_date, req.file?.filename ?? null,
+      `).run(body.title, body.description, body.start_date, body.end_date, cover,
         JSON.stringify(body.tags), body.cover_position_x, body.cover_position_y);
       insertLocations(result.lastInsertRowid, body.new_locations, 0);
       return result.lastInsertRowid;
@@ -68,12 +89,13 @@ router.post('/', upload.single('cover_image'), verifyImages, (req: Request, res:
     res.status(201).json(getTrip(Number(tripId)));
   } catch (err) {
     removeUploadedFiles(req);
-    throw err;
+    deleteUpload(cover);
+    next(err);
   }
 });
 
 // ─── PUT update trip (plus added/removed locations, atomically) ─────────────
-router.put('/:id', upload.single('cover_image'), verifyImages, (req: Request, res: Response) => {
+router.put('/:id', upload.single('cover_image'), verifyMedia(['image']), async (req: Request, res: Response, next: NextFunction) => {
   const existing = getTripRow(req.params.id);
   if (!existing) {
     removeUploadedFiles(req);
@@ -90,8 +112,15 @@ router.put('/:id', upload.single('cover_image'), verifyImages, (req: Request, re
     return res.status(400).json({ error: 'Invalid data', details: ['end_date: must not be before start_date'] });
   }
 
-  const replacingCover = !!req.file || body.remove_cover === true;
-  const coverImage = req.file ? req.file.filename : body.remove_cover ? null : existing.cover_image;
+  let newCover: string | null = null;
+  try {
+    newCover = await prepareCover(req);
+  } catch (err) {
+    removeUploadedFiles(req);
+    return next(err);
+  }
+  const replacingCover = !!newCover || body.remove_cover === true;
+  const coverImage = newCover ?? (body.remove_cover ? null : existing.cover_image);
 
   try {
     db.transaction(() => {
@@ -123,7 +152,8 @@ router.put('/:id', upload.single('cover_image'), verifyImages, (req: Request, re
     })();
   } catch (err) {
     removeUploadedFiles(req);
-    throw err;
+    deleteUpload(newCover);
+    return next(err);
   }
 
   // Only touch the disk once the database change is committed
@@ -136,10 +166,11 @@ router.delete('/:id', (req: Request, res: Response) => {
   const trip = getTripRow(req.params.id);
   if (!trip) return res.status(404).json({ error: 'Trip not found' });
 
-  const photos = db.prepare('SELECT filename FROM photos WHERE trip_id = ?').all(trip.id) as Pick<PhotoRow, 'filename'>[];
+  const photos = db.prepare('SELECT filename, original_filename, thumb_filename FROM photos WHERE trip_id = ?')
+    .all(trip.id) as Pick<PhotoRow, 'filename' | 'original_filename' | 'thumb_filename'>[];
   db.prepare('DELETE FROM trips WHERE id = ?').run(trip.id);
 
-  photos.forEach((p) => deleteUpload(p.filename));
+  photos.forEach(deleteMediaFiles);
   deleteUpload(trip.cover_image);
   res.json({ message: 'Trip deleted successfully' });
 });
