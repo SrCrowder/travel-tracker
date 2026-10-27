@@ -1,6 +1,14 @@
+import type { TripStatus } from '../../types';
+
 export const AVAILABLE_TAGS = ['adventure', 'food', 'hiking', 'culture', 'beach', 'city', 'nature'];
+export const TRIP_STATUSES: TripStatus[] = ['done', 'planned', 'wishlist'];
+export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'MXN', 'ARS', 'COP', 'CLP', 'BRL', 'CAD', 'AUD', 'MAD', 'THB', 'CNY', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'TRY', 'ISK'];
 
 export interface TripFormValues {
+  status: TripStatus;
+  /** Text so the field can be empty */
+  budget: string;
+  currency: string;
   title: string;
   description: string;
   startDate: string;
@@ -13,6 +21,7 @@ export interface TripFormValues {
 }
 
 export const EMPTY_TRIP_FORM: TripFormValues = {
+  status: 'done', budget: '', currency: 'EUR',
   title: '', description: '', startDate: '', endDate: '', tags: [],
   coverFile: null, coverPreview: '', coverPosX: 50, coverPosY: 50,
 };
@@ -21,6 +30,7 @@ export const EMPTY_TRIP_FORM: TripFormValues = {
 export interface LocationDraft {
   name: string;
   country: string;
+  country_code?: string;
   lat: number;
   lng: number;
   date_start: string;

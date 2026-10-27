@@ -40,6 +40,7 @@ export default function LocationDraftForm({ onAdd, onError }: LocationDraftFormP
     update({
       name: result.display_name.split(',')[0].trim(),
       country: result.address?.country ?? search.split(',').pop()?.trim() ?? '',
+      country_code: result.address?.country_code?.toUpperCase(),
       lat: parseFloat(result.lat),
       lng: parseFloat(result.lon),
     });

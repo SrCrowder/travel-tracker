@@ -26,7 +26,14 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 
 | Feature | Description |
 |---|---|
-| Trip management | Create, edit, delete trips with title, dates, description, tags, cover photo |
+| Trip management | Create, edit, delete trips with title, dates, description, tags, cover photo, budget |
+| Done / planned / wishlist | Each trip has a status; wishlist trips may have no dates. The dashboard filters by status and the stats count only trips that happened |
+| World map | Dashboard map of visited countries (and planned ones), drawn from the locations' country codes — no tile server needed |
+| Expenses & budget | Per-trip expenses (category, date, place, any currency); totals per category, per day and against the budget |
+| GPS tracks | Upload GPX/KML files (watch, Strava, Wikiloc, Google My Maps…); drawn on the trip map with their distance |
+| Share link | Read-only public page of a trip (map, timeline, photos/videos) — no login needed; notes, expenses and budget stay private; revocable |
+| Backup | Download everything (database + all files) as a ZIP; restore a ZIP (the previous database is kept as `pre-restore-*.db`) |
+| Reorder route | Drag (or use the keyboard on) the handle in the trip's location list |
 | Cover photo reposition | Drag to set the focal point of the cover image (shown in cards and hero) |
 | Locations | Add locations to a trip with coordinates, dates, star rating, description, private notes |
 | Interactive map | react-leaflet map with numbered markers; toggle between straight-line and road routing (OSRM) |
@@ -307,6 +314,7 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 | `DATA_DIR` / `UPLOADS_DIR` | `backend/data`, `backend/uploads` | Where the database and the uploaded files live (`/app/data`, `/app/uploads` in Docker) |
 | `MAX_IMAGE_MB` / `MAX_VIDEO_MB` | `50` / `4096` | Largest photo / video accepted |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Needed for videos (included in the Docker image). Without them video uploads are refused |
+| `ALLOWED_HOSTS` | *(empty)* | Comma-separated host names the app is reached by (e.g. `travel.example.com,192.168.1.10:5173`). Other `Host` headers get `421`, which blocks DNS-rebinding attacks. **Recommended when the login is off** |
 | `SEED_DEMO` | `true` | Adds 3 demo trips **only when the database is created**. Set `false` to start empty |
 | `WEB_USER` | `admin` | Login username (only used when `WEB_PASSWORD` is set) |
 | `WEB_PASSWORD` | *(empty)* | Set it to require a login for the whole app (API and photos). Empty = no login, fine on a private LAN |
@@ -388,6 +396,18 @@ SQLite file lives at:
 3. Videos: `ffprobe` reads date, GPS and camera (`com.apple.quicktime.*` tags), `ffmpeg` grabs a poster frame. H.264 videos are remuxed to MP4 (no quality loss); anything else (iPhone HEVC, 10-bit HDR…) is re-encoded to H.264 1080p **in the background** — the upload answers at once with `status: processing` and the trip page refreshes until it's ready. Interrupted conversions resume on restart.
 4. Photos uploaded before this existed get thumbnails and EXIF data in the background on startup.
 
+#### `trips` (added in migration 3)
+`status` (`done` / `planned` / `wishlist`), `share_token`, `budget`, `currency` (ISO 4217, default `EUR`). `start_date` / `end_date` are NULL only for wishlist trips.
+
+#### `locations.country_code`
+ISO 3166-1 alpha-2, filled from OpenStreetMap when a place is searched or created by the photo import. Older locations are matched by country name for the world map.
+
+#### `expenses`
+`id`, `trip_id` (cascade), `location_id` (set null), `date`, `category`, `description`, `amount`, `currency`, `created_at`.
+
+#### `tracks`
+`id`, `trip_id` (cascade), `name`, `geojson` (FeatureCollection of LineStrings), `distance_m`, `created_at`.
+
 ### Adding a new column (migrations)
 
 Migrations live in `backend/src/database/migrations.ts`. Each entry runs once, in order, inside a transaction, and `PRAGMA user_version` records how many have run. To change the schema, **append** a new entry (never edit one that has shipped):
@@ -399,6 +419,8 @@ Migrations live in `backend/src/database/migrations.ts`. Each entry runs once, i
 ```
 
 Databases created before versioning (user_version 0) are handled by migration 1, which is idempotent.
+
+Migrations run with **foreign keys off** (so a table can be rebuilt — `DROP TABLE` would otherwise cascade-delete its children) and `PRAGMA foreign_key_check` must be clean before each one commits.
 
 ---
 
@@ -456,6 +478,49 @@ When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/up
 - `photos` (one or more files, up to 50 per request: photos — jpg, png, gif, webp, avif, heic, tiff, max 50 MB — and videos — mov, mp4, webm, max 4 GB. The type is detected from the content and non-media files are rejected with `400`)
 - `location_id` (number, optional — omit for general trip photo)
 - `caption` (string, optional — applied to all uploaded files)
+
+### Share links
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/trips/:id/share` | Creates (or returns) the trip's share token |
+| DELETE | `/api/trips/:id/share` | Turns the link off |
+| GET | `/api/public/trips/:token` | **No login.** The trip, without notes, budget or expenses |
+| GET | `/api/public/:token/media/:filename` | **No login.** Only that trip's cover, photos/videos and thumbnails |
+
+The frontend page is `/share/:token`.
+
+### Expenses
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/api/trips/:tripId/expenses` | — | Expenses by date |
+| POST | `/api/trips/:tripId/expenses` | `{ amount, category?, description?, date?, currency?, location_id? }` | Currency defaults to the trip's |
+| PUT | `/api/trips/:tripId/expenses/:id` | same, partial | |
+| DELETE | `/api/trips/:tripId/expenses/:id` | — | |
+
+Categories: `transport`, `lodging`, `food`, `activities`, `shopping`, `other`.
+
+### GPS tracks
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| POST | `/api/trips/:tripId/tracks` | multipart `file` (.gpx / .kml, max 25 MB) | Lines are kept (waypoints ignored), thinned to 5000 points; returns name and `distance_m` |
+| DELETE | `/api/trips/:tripId/tracks/:id` | — | |
+
+Tracks are also included in `GET /api/trips/:id` (`tracks[].geojson`).
+
+### Backup
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/backup` | ZIP with `travel.db` (consistent snapshot) and `uploads/` |
+| POST | `/api/backup/restore` | multipart `backup` (the ZIP). Replaces **all** trips; files are added, none deleted; the previous DB is saved as `data/pre-restore-<date>.db` |
+
+### Security notes
+
+- Writes to `/api` from another website (`Origin` ≠ host) are refused with `403`.
+- With `WEB_PASSWORD` set, everything except `/api/auth`, `/api/public` and `/health` needs the session cookie.
 
 ### Health
 

@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft, Calendar, MapPin, Clock, Tag, Trash2, MoreVertical, Pencil, ImagePlus, FileDown, Loader2, Images,
+  ArrowLeft, Calendar, MapPin, Clock, Tag, Trash2, MoreVertical, Pencil, ImagePlus, FileDown, Loader2, Images, Link2,
+  Sparkles, CalendarClock,
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { tripsApi, locationsApi, getImageUrl, allMedia } from '../api/client';
 import Navbar from '../components/Navbar';
@@ -18,6 +18,11 @@ import AddTripModal from '../components/AddTripModal';
 import PhotoUploadModal from '../components/PhotoUploadModal';
 import ImportPhotosModal from '../components/ImportPhotosModal';
 import Lightbox from '../components/Lightbox';
+import ShareDialog from '../components/ShareDialog';
+import ExpensesPanel from '../components/ExpensesPanel';
+import SortableLocationList from '../components/SortableLocationList';
+import TracksPanel from '../components/TracksPanel';
+import { formatTripRange, tripDays } from '../lib/tripDates';
 import { useDateLocale } from '../i18n/useDateLocale';
 import { useTripPdfExport } from '../hooks/useTripPdfExport';
 import type { Trip, Location, Photo } from '../types';
@@ -33,8 +38,8 @@ const TAG_COLORS: Record<string, string> = {
   default:   'bg-white/20 text-white',
 };
 
-type TabId = 'map' | 'timeline' | 'photos';
-const TAB_IDS: TabId[] = ['map', 'timeline', 'photos'];
+type TabId = 'map' | 'timeline' | 'photos' | 'expenses';
+const TAB_IDS: TabId[] = ['map', 'timeline', 'photos', 'expenses'];
 
 export default function TripDetail() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +56,7 @@ export default function TripDetail() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadDefaultLocationId, setUploadDefaultLocationId] = useState<number | undefined>();
   const [importOpen, setImportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [mapLightbox, setMapLightbox] = useState<{ photos: Photo[]; index: number } | null>(null);
 
   const openUploadModal = (locationId?: number) => {
@@ -98,11 +104,13 @@ export default function TripDetail() {
   if (isLoading) return <><Navbar /><LoadingSpinner message={t('tripDetail.loading')} /></>;
   if (!trip) return <><Navbar /><div className="p-8 text-center text-slate-500">{t('tripDetail.notFound')}</div></>;
 
-  const durationDays =
-    Math.ceil(
-      (new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) /
-        (1000 * 60 * 60 * 24)
-    ) + 1;
+  const durationDays = tripDays(trip);
+  const refreshTrip = () => qc.invalidateQueries({ queryKey: ['trip', id] });
+
+  const reorderLocations = async (ordered: Location[]) => {
+    await locationsApi.reorder(trip.id, ordered.map((l, i) => ({ id: l.id, order_index: i })));
+    refreshTrip();
+  };
 
   const sortedLocations = [...(trip.locations ?? [])].sort(
     (a, b) => a.order_index - b.order_index
@@ -172,6 +180,13 @@ export default function TripDetail() {
                   {t('tripDetail.editTrip')}
                 </button>
                 <button
+                  onClick={() => { setMenuOpen(false); setShareOpen(true); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <Link2 size={15} />
+                  {trip.share_token ? t('share.manage') : t('share.menu')}
+                </button>
+                <button
                   onClick={() => { setMenuOpen(false); setImportOpen(true); }}
                   className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                 >
@@ -205,9 +220,17 @@ export default function TripDetail() {
           transition={{ delay: 0.1 }}
           className="absolute bottom-0 left-0 right-0 px-6 pb-6 md:px-8 md:pb-8"
         >
-          {/* Tags */}
-          {trip.tags.length > 0 && (
+          {/* Status + tags */}
+          {(trip.tags.length > 0 || trip.status !== 'done') && (
             <div className="flex flex-wrap gap-1.5 mb-3">
+              {trip.status !== 'done' && (
+                <span className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold ${
+                  trip.status === 'planned' ? 'bg-amber-400 text-amber-950' : 'bg-pink-500 text-white'
+                }`}>
+                  {trip.status === 'planned' ? <CalendarClock size={11} /> : <Sparkles size={11} />}
+                  {t(`tripStatus.${trip.status}`)}
+                </span>
+              )}
               {trip.tags.map((tag) => (
                 <span
                   key={tag}
@@ -229,14 +252,14 @@ export default function TripDetail() {
           <div className="flex flex-wrap items-center gap-4 text-white/80 text-sm">
             <span className="flex items-center gap-1.5">
               <Calendar size={14} />
-              {format(new Date(trip.start_date), 'MMM d', { locale: dateLocale })}
-              {' – '}
-              {format(new Date(trip.end_date), 'MMM d, yyyy', { locale: dateLocale })}
+              {formatTripRange(trip, dateLocale) ?? t('tripCard.noDates')}
             </span>
-            <span className="flex items-center gap-1.5">
-              <Clock size={14} />
-              {t('tripDetail.days', { count: durationDays })}
-            </span>
+            {durationDays !== null && (
+              <span className="flex items-center gap-1.5">
+                <Clock size={14} />
+                {t('tripDetail.days', { count: durationDays })}
+              </span>
+            )}
             {sortedLocations.length > 0 && (
               <span className="flex items-center gap-1.5">
                 <MapPin size={14} />
@@ -263,7 +286,7 @@ export default function TripDetail() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-white dark:bg-slate-800 p-1 rounded-xl w-fit shadow-card">
+        <div className="flex gap-1 mb-6 bg-white dark:bg-slate-800 p-1 rounded-xl w-fit max-w-full overflow-x-auto shadow-card">
           {TAB_IDS.map((tabId) => (
             <button
               key={tabId}
@@ -311,6 +334,7 @@ export default function TripDetail() {
                     setSelectedLocation((prev) => (prev?.id === loc.id ? null : loc))
                   }
                   media={geotaggedMedia}
+                  tracks={trip.tracks}
                   onMediaClick={(photo) =>
                     setMapLightbox({ photos: geotaggedMedia, index: geotaggedMedia.findIndex((p) => p.id === photo.id) })
                   }
@@ -346,40 +370,36 @@ export default function TripDetail() {
                           {t('tripDetail.mapPanel.empty')}
                         </p>
                       ) : (
-                        <ol className="space-y-2">
-                          {sortedLocations.map((loc, i) => (
-                            <motion.li key={loc.id} whileHover={{ x: 2 }}>
-                              <button
-                                onClick={() => setSelectedLocation(loc)}
-                                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-left group"
-                              >
-                                <span className="w-7 h-7 flex items-center justify-center bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 rounded-full text-xs font-bold shrink-0">
-                                  {i + 1}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-slate-800 dark:text-white text-sm truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                                    {loc.name}
-                                  </p>
-                                  {loc.country && (
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                                      {loc.country}
-                                    </p>
-                                  )}
-                                </div>
-                                {loc.photos && loc.photos.length > 0 && (
-                                  <span className="text-xs text-slate-400 shrink-0">
-                                    📷 {loc.photos.length}
-                                  </span>
-                                )}
-                              </button>
-                            </motion.li>
-                          ))}
-                        </ol>
+                        <>
+                          {sortedLocations.length > 1 && (
+                            <p className="text-xs text-slate-400 -mt-2 mb-3">{t('tripDetail.mapPanel.dragHint')}</p>
+                          )}
+                          <SortableLocationList
+                            locations={sortedLocations}
+                            onSelect={setSelectedLocation}
+                            onReorder={reorderLocations}
+                          />
+                        </>
                       )}
+
+                      <TracksPanel tripId={trip.id} tracks={trip.tracks ?? []} onChanged={refreshTrip} />
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+            </motion.div>
+          )}
+
+          {/* ── EXPENSES TAB ── */}
+          {activeTab === 'expenses' && (
+            <motion.div
+              key="expenses"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ExpensesPanel trip={trip} />
             </motion.div>
           )}
 
@@ -437,6 +457,11 @@ export default function TripDetail() {
           qc.invalidateQueries({ queryKey: ['trips'] });
         }}
       />
+
+      {/* Share link */}
+      <AnimatePresence>
+        {shareOpen && <ShareDialog trip={trip} onClose={() => setShareOpen(false)} onChanged={refreshTrip} />}
+      </AnimatePresence>
 
       {/* Bulk import of photos/videos into this trip */}
       <ImportPhotosModal isOpen={importOpen} onClose={() => setImportOpen(false)} defaultTripId={trip.id} />

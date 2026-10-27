@@ -43,10 +43,11 @@ export default function Timeline({ trip }: TimelineProps) {
   const mediaDays = [...mediaByDay.keys()].sort();
 
   // The trip's days, stretched if some photos fall outside them
-  const first = [trip.start_date, mediaDays[0]].filter(Boolean).sort()[0];
-  const last = [trip.end_date, mediaDays[mediaDays.length - 1]].filter(Boolean).sort().pop()!;
-  const days = eachDayOfInterval({ start: parseISO(first), end: parseISO(last) });
-  const tripStart = parseISO(trip.start_date);
+  const first = [trip.start_date, mediaDays[0]].filter((d): d is string => !!d).sort()[0];
+  const last = [trip.end_date, mediaDays[mediaDays.length - 1]].filter((d): d is string => !!d).sort().pop();
+  // A wishlist trip without dates nor dated photos has no timeline
+  const days = first && last ? eachDayOfInterval({ start: parseISO(first), end: parseISO(last) }) : [];
+  const tripStart = parseISO(trip.start_date ?? first ?? '1970-01-01');
 
   return (
     <>

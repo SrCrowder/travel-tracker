@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
-import { Upload } from 'lucide-react';
+import { Upload, CheckCircle2, CalendarClock, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import CoverPositionPicker from '../CoverPositionPicker';
-import { AVAILABLE_TAGS, inputClass, labelClass, type TripFormValues } from './types';
+import { AVAILABLE_TAGS, CURRENCIES, TRIP_STATUSES, inputClass, labelClass, type TripFormValues } from './types';
+
+const STATUS_ICONS = { done: CheckCircle2, planned: CalendarClock, wishlist: Sparkles };
 
 interface TripInfoStepProps {
   values: TripFormValues;
@@ -39,14 +41,51 @@ export default function TripInfoStep({ values, onChange }: TripInfoStepProps) {
           placeholder={t('addTrip.fields.tripTitlePlaceholder')} className={inputClass} />
       </div>
 
+      {/* Done / planned / wishlist */}
+      <div className="grid grid-cols-3 gap-2">
+        {TRIP_STATUSES.map((status) => {
+          const Icon = STATUS_ICONS[status];
+          return (
+            <button key={status} type="button" onClick={() => onChange({ status })}
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-xs sm:text-sm font-medium border transition-colors ${
+                values.status === status
+                  ? 'bg-primary-600 border-primary-600 text-white'
+                  : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-primary-300'
+              }`}>
+              <Icon size={14} />
+              {t(`tripStatus.${status}`)}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>{t('addTrip.fields.startDate')}</label>
+          <label className={labelClass}>
+            {t(values.status === 'wishlist' ? 'addTrip.fields.startDateOptional' : 'addTrip.fields.startDate')}
+          </label>
           <input type="date" value={values.startDate} onChange={(e) => onChange({ startDate: e.target.value })} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>{t('addTrip.fields.endDate')}</label>
+          <label className={labelClass}>
+            {t(values.status === 'wishlist' ? 'addTrip.fields.endDateOptional' : 'addTrip.fields.endDate')}
+          </label>
           <input type="date" value={values.endDate} min={values.startDate} onChange={(e) => onChange({ endDate: e.target.value })} className={inputClass} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto] gap-3">
+        <div>
+          <label className={labelClass}>{t('addTrip.fields.budget')}</label>
+          <input type="number" min={0} step="any" inputMode="decimal" value={values.budget}
+            onChange={(e) => onChange({ budget: e.target.value })} placeholder={t('addTrip.fields.budgetPlaceholder')}
+            className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>{t('addTrip.fields.currency')}</label>
+          <select value={values.currency} onChange={(e) => onChange({ currency: e.target.value })} className={inputClass}>
+            {[...new Set([values.currency, ...CURRENCIES])].map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
       </div>
 

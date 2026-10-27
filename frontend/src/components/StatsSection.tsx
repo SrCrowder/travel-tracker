@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Map, Globe, CalendarDays, Camera } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Trip } from '../types';
+import { tripDays } from '../lib/tripDates';
 
 interface StatsSectionProps {
   trips: Trip[];
@@ -10,10 +11,7 @@ interface StatsSectionProps {
 export default function StatsSection({ trips }: StatsSectionProps) {
   const { t } = useTranslation();
 
-  const totalDays = trips.reduce((sum, trip) => {
-    const diff = new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime();
-    return sum + Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
-  }, 0);
+  const totalDays = trips.reduce((sum, trip) => sum + (tripDays(trip) ?? 0), 0);
 
   const countries = new Set(
     trips.flatMap((t) => t.locations?.map((l) => l.country).filter(Boolean) ?? [])

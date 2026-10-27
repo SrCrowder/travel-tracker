@@ -49,7 +49,8 @@
     "locations": "Ubicaciones"
   },
   "tripCard": {
-    "moreLocations": "+{{count}} más"
+    "moreLocations": "+{{count}} más",
+    "noDates": "Sin fechas"
   },
   "emptyState": {
     "filteredTitle": "Ningún viaje coincide con los filtros",
@@ -82,11 +83,14 @@
     "tabs": {
       "map": "Mapa",
       "timeline": "Cronología",
-      "photos": "Fotos"
+      "photos": "Fotos",
+      "expenses": "Gastos"
     },
     "mapPanel": {
       "title": "Ubicaciones",
-      "empty": "Aún no hay ubicaciones."
+      "empty": "Aún no hay ubicaciones.",
+      "dragHint": "Arrastra ⋮⋮ para cambiar el orden de la ruta",
+      "dragHandle": "Mover"
     },
     "uploadPhotos": "Subir fotos o vídeos",
     "exportPdf": "Exportar PDF",
@@ -152,7 +156,12 @@
       "coverImage": "Imagen de portada",
       "coverDrop": "Arrastra una imagen o haz clic para subir",
       "coverFormats": "JPG, PNG, WebP — máx. 10 MB",
-      "dragToReposition": "Arrastra para reposicionar"
+      "dragToReposition": "Arrastra para reposicionar",
+      "startDateOptional": "Fecha de inicio (opcional)",
+      "endDateOptional": "Fecha de fin (opcional)",
+      "budget": "Presupuesto (opcional)",
+      "budgetPlaceholder": "p. ej. 1500",
+      "currency": "Moneda"
     },
     "locations": {
       "routeLabel": "Ruta ({{count}})",
@@ -178,7 +187,9 @@
     "errors": {
       "fillTitleDates": "Por favor, rellena el título y las fechas.",
       "geocodingFailed": "No se pudo obtener la ubicación. Introduce las coordenadas manualmente.",
-      "saveFailed": "No se pudo guardar el viaje. Inténtalo de nuevo."
+      "saveFailed": "No se pudo guardar el viaje. Inténtalo de nuevo.",
+      "bothDates": "Pon las dos fechas o ninguna.",
+      "dateOrder": "La fecha de fin no puede ser anterior a la de inicio."
     },
     "saveChanges": "Guardar cambios",
     "saveTrip": "Guardar viaje"
@@ -263,5 +274,82 @@
       "pickTrip": "Elige el viaje al que añadirlos.",
       "failed": "No se pudo crear o actualizar el viaje. Inténtalo de nuevo."
     }
+  },
+  "tripStatus": {
+    "done": "Realizado",
+    "planned": "Planeado",
+    "wishlist": "Deseo",
+    "filter": {
+      "all": "Todos",
+      "done": "Realizados",
+      "planned": "Próximos",
+      "wishlist": "Lista de deseos"
+    }
+  },
+  "worldMap": {
+    "title": "Mapa del mundo",
+    "visited_one": "país visitado",
+    "visited_other": "países visitados",
+    "legendVisited": "Visitado",
+    "legendPlanned": "Planeado / deseo"
+  },
+  "share": {
+    "menu": "Compartir enlace",
+    "manage": "Enlace compartido",
+    "title": "Compartir viaje",
+    "explain": "Quien tenga el enlace podrá ver este viaje (mapa, cronología, fotos y vídeos) sin iniciar sesión. Las notas privadas, los gastos y el presupuesto no se muestran.",
+    "create": "Crear enlace",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "revoke": "Desactivar el enlace",
+    "invalid": "Este enlace ya no es válido.",
+    "sharedTrip": "Viaje compartido"
+  },
+  "expenses": {
+    "summary": "Resumen",
+    "budget": "Presupuesto",
+    "over": "{{amount}} por encima del presupuesto",
+    "left": "Quedan {{amount}}",
+    "perDay": "{{amount}} al día de media",
+    "add": "Añadir gasto",
+    "edit": "Editar gasto",
+    "delete": "Borrar gasto",
+    "amount": "Importe",
+    "description": "Descripción (opcional)",
+    "noLocation": "Sin lugar",
+    "empty": "Aún no hay gastos en este viaje.",
+    "deleteConfirm": "¿Borrar este gasto?",
+    "categories": {
+      "transport": "Transporte",
+      "lodging": "Alojamiento",
+      "food": "Comida",
+      "activities": "Actividades",
+      "shopping": "Compras",
+      "other": "Otros"
+    },
+    "errors": {
+      "amount": "Escribe un importe válido.",
+      "save": "No se pudo guardar el gasto."
+    }
+  },
+  "tracks": {
+    "title": "Rutas GPS",
+    "upload": "Subir GPX/KML",
+    "empty": "Sube un archivo GPX o KML (de tu reloj, Strava, Wikiloc, Google My Maps…) para dibujar el recorrido.",
+    "invalid": "El archivo no tiene rutas o no es un GPX/KML válido.",
+    "failed": "No se pudo subir la ruta.",
+    "deleteConfirm": "¿Borrar la ruta «{{name}}»?",
+    "delete": "Borrar ruta"
+  },
+  "backup": {
+    "title": "Copia de seguridad",
+    "exportExplain": "Descarga un ZIP con todos los viajes, fotos y vídeos (originales incluidos).",
+    "export": "Descargar copia",
+    "restoreExplain": "Restaurar una copia reemplaza todos los viajes actuales por los de la copia. La base de datos actual se guarda aparte (pre-restore-…db) por si acaso.",
+    "restore": "Restaurar desde ZIP",
+    "restoring": "Restaurando… {{percent}}%",
+    "confirmRestore": "Se reemplazarán TODOS los viajes por los de «{{name}}». ¿Continuar?",
+    "restored": "Copia restaurada: {{trips}} viajes y {{files}} archivos.",
+    "restoreFailed": "No se pudo restaurar la copia"
   }
 }

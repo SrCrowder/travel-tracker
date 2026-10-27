@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Compass, X, LogOut, Images } from 'lucide-react';
+import { Search, Plus, Compass, X, LogOut, Images, DatabaseBackup } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi, type AuthStatus } from '../api/client';
 import DarkModeToggle from './DarkModeToggle';
+import BackupModal from './BackupModal';
 import { useStore } from '../store/useStore';
 import i18n from '../i18n';
 import type { Language } from '../store/useStore';
@@ -20,6 +21,7 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
   const { searchQuery, setSearchQuery, language, setLanguage } = useStore();
   const { t } = useTranslation();
   const [searchFocused, setSearchFocused] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -127,6 +129,15 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
 
             <DarkModeToggle />
 
+            <button
+              onClick={() => setBackupOpen(true)}
+              title={t('backup.title')}
+              aria-label={t('backup.title')}
+              className="hidden sm:block p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+            >
+              <DatabaseBackup size={18} />
+            </button>
+
             {auth?.authRequired && (
               <button
                 onClick={handleLogout}
@@ -163,6 +174,9 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {backupOpen && <BackupModal onClose={() => setBackupOpen(false)} />}
+      </AnimatePresence>
     </nav>
   );
 }

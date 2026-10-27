@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { tripsApi } from '../api/client';
 import TripCard from '../components/TripCard';
 import TripCalendar from '../components/TripCalendar';
@@ -14,13 +14,21 @@ import EmptyState from '../components/EmptyState';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Navbar from '../components/Navbar';
 import { useStore } from '../store/useStore';
-import type { Trip, TripDate } from '../types';
+import { tripYear } from '../lib/tripDates';
+import type { Trip, TripDate, TripStatus } from '../types';
+
+// Leaflet + country outlines: loaded with the dashboard, not the first paint
+const WorldMap = lazy(() => import('../components/WorldMap'));
+
+type StatusFilter = 'all' | TripStatus;
+const STATUS_FILTERS: StatusFilter[] = ['all', 'done', 'planned', 'wishlist'];
 
 export default function Dashboard() {
   const { searchQuery, selectedYear, selectedTags } = useStore();
   const { t } = useTranslation();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const { data: trips = [], isLoading, refetch } = useQuery({
     queryKey: ['trips'],
@@ -34,8 +42,9 @@ export default function Dashboard() {
   const tripDates = useMemo<TripDate[]>(() => {
     return trips.flatMap((trip) => {
       const dates: TripDate[] = [];
-      const start = new Date(trip.start_date);
-      const end = new Date(trip.end_date);
+      if (!trip.start_date || !trip.end_date) return dates;
+      const start = parseISO(trip.start_date);
+      const end = parseISO(trip.end_date);
       const current = new Date(start);
       while (current <= end) {
         dates.push({ date: new Date(current), tripId: trip.id, tripTitle: trip.title });
@@ -56,13 +65,17 @@ export default function Dashboard() {
         trip.locations?.some(
           (l) => l.name.toLowerCase().includes(q) || l.country.toLowerCase().includes(q)
         );
-      const matchesYear = !selectedYear || new Date(trip.start_date).getFullYear() === selectedYear;
+      const matchesYear = !selectedYear || tripYear(trip) === selectedYear;
       const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => trip.tags.includes(tag));
-      return matchesSearch && matchesYear && matchesTags;
+      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
+      return matchesSearch && matchesYear && matchesTags && matchesStatus;
     });
-  }, [trips, searchQuery, selectedYear, selectedTags]);
+  }, [trips, searchQuery, selectedYear, selectedTags, statusFilter]);
 
-  const isFiltered = !!searchQuery || selectedYear !== null || selectedTags.length > 0;
+  const isFiltered = !!searchQuery || selectedYear !== null || selectedTags.length > 0 || statusFilter !== 'all';
+  // Stats count only the trips that actually happened
+  const doneTrips = useMemo(() => trips.filter((trip) => trip.status === 'done'), [trips]);
+  const statusCount = (s: StatusFilter) => (s === 'all' ? trips.length : trips.filter((trip) => trip.status === s).length);
 
   if (isLoading) return (
     <>
@@ -93,7 +106,29 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        {trips.length > 0 && <StatsSection trips={trips} />}
+        {doneTrips.length > 0 && <StatsSection trips={doneTrips} />}
+
+        {trips.length > 0 && (
+          <Suspense fallback={<div className="h-80 mb-8 rounded-2xl bg-white dark:bg-slate-800 shadow-card animate-pulse" />}>
+            <WorldMap trips={trips} />
+          </Suspense>
+        )}
+
+        {/* Done / planned / wishlist */}
+        {trips.some((trip) => trip.status !== 'done') && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {STATUS_FILTERS.map((s) => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  statusFilter === s
+                    ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm'
+                }`}>
+                {t(`tripStatus.filter.${s}`)} <span className="opacity-60 ml-0.5">{statusCount(s)}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="mb-6">
           <FilterBar trips={trips} onAddTrip={() => setIsAddModalOpen(true)} />

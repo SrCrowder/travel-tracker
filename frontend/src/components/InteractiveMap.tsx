@@ -5,6 +5,8 @@ import {
   Marker,
   Popup,
   Polyline,
+  GeoJSON,
+  Tooltip,
   useMap,
 } from 'react-leaflet';
 import L from 'leaflet';
@@ -14,7 +16,9 @@ import { motion } from 'framer-motion';
 import { Loader2, Images } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { thumbUrl } from '../api/client';
-import type { Location, Photo } from '../types';
+import type { Location, Photo, Track } from '../types';
+
+const TRACK_COLOR = '#EA580C';
 
 // Fix Leaflet's broken default icon paths in Vite/webpack
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -85,6 +89,8 @@ interface InteractiveMapProps {
   /** Photos/videos with GPS are shown as thumbnails; click opens them */
   media?: Photo[];
   onMediaClick?: (photo: Photo) => void;
+  /** GPS tracks drawn as lines */
+  tracks?: Track[];
   height?: string;
 }
 
@@ -94,6 +100,7 @@ export default function InteractiveMap({
   onLocationSelect,
   media = [],
   onMediaClick,
+  tracks = [],
   height = '520px',
 }: InteractiveMapProps) {
   const { t } = useTranslation();
@@ -106,8 +113,13 @@ export default function InteractiveMap({
   const sorted = [...locations].sort((a, b) => a.order_index - b.order_index);
   const routePoints: [number, number][] = sorted.map((l) => [l.lat, l.lng]);
   const mediaPoints: [number, number][] = geotagged.map((p) => [p.lat!, p.lng!]);
-  // Frame the route; with no locations, frame the photos instead
-  const framePoints = routePoints.length > 0 ? routePoints : showMedia ? mediaPoints : [];
+  const trackPoints: [number, number][] = tracks.flatMap((t) =>
+    t.geojson.features.flatMap((f) => {
+      const c = f.geometry.coordinates;
+      return [c[0], c[c.length - 1]].map(([lng, lat]) => [lat, lng] as [number, number]);
+    }));
+  // Frame the route (and tracks); with neither, frame the photos instead
+  const framePoints = routePoints.length + trackPoints.length > 0 ? [...routePoints, ...trackPoints] : showMedia ? mediaPoints : [];
   const center: [number, number] = framePoints[0] ?? [20, 0];
 
   // Stable key — re-fetch only when coordinates actually change
@@ -191,6 +203,14 @@ export default function InteractiveMap({
             )}
           </>
         )}
+
+        {/* GPS tracks */}
+        {tracks.map((track) => (
+          <GeoJSON key={`track-${track.id}`} data={track.geojson}
+            style={{ color: TRACK_COLOR, weight: 3.5, opacity: 0.85 }}>
+            <Tooltip sticky>{track.name}</Tooltip>
+          </GeoJSON>
+        ))}
 
         {/* Location markers */}
         {sorted.map((location, index) => (

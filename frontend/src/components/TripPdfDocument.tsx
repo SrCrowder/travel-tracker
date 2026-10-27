@@ -157,7 +157,7 @@ function renderPhotoRows(rows: Photo[][], imageMap: Record<string, string>) {
 export default function TripPdfDocument({ trip, imageMap }: TripPdfDocumentProps) {
   const sorted      = [...(trip.locations ?? [])].sort((a, b) => a.order_index - b.order_index);
   const hasCover    = !!(trip.cover_image && imageMap[trip.cover_image]);
-  const dateRange   = `${fmtDate(trip.start_date)} – ${fmtDate(trip.end_date)}`;
+  const dateRange   = trip.start_date && trip.end_date ? `${fmtDate(trip.start_date)} – ${fmtDate(trip.end_date)}` : '';
   const generalRows = photoRows(trip.photos ?? [], imageMap);
 
   return (

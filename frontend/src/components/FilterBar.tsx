@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import type { Trip } from '../types';
+import { tripYear } from '../lib/tripDates';
 
 const TAGS = ['adventure', 'food', 'hiking', 'culture', 'beach', 'city', 'nature'];
 
@@ -21,7 +22,7 @@ export default function FilterBar({ trips, onAddTrip }: FilterBarProps) {
   } = useStore();
 
   const years = useMemo(() => {
-    const ys = new Set(trips.map((t) => new Date(t.start_date).getFullYear()));
+    const ys = new Set(trips.map(tripYear).filter((y): y is number => y !== null));
     return Array.from(ys).sort((a, b) => b - a);
   }, [trips]);
 

@@ -18,10 +18,13 @@ interface AddTripModalProps {
 
 function formFromTrip(trip: Trip): TripFormValues {
   return {
+    status: trip.status,
+    budget: trip.budget != null ? String(trip.budget) : '',
+    currency: trip.currency ?? 'EUR',
     title: trip.title,
     description: trip.description ?? '',
-    startDate: trip.start_date,
-    endDate: trip.end_date,
+    startDate: trip.start_date ?? '',
+    endDate: trip.end_date ?? '',
     tags: [...trip.tags],
     coverFile: null,
     coverPreview: trip.cover_image ? getImageUrl(trip.cover_image) : '',
@@ -62,9 +65,19 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, initialTrip }
   const updateForm = useCallback((patch: Partial<TripFormValues>) => setForm((f) => ({ ...f, ...patch })), []);
 
   // ── Submit: trip + location changes go in one request (one transaction) ──
+  // Dates are optional only for wishlist trips (but then both or none)
+  const datesError = (): string => {
+    if (!form.title) return t('addTrip.errors.fillTitleDates');
+    if (form.status !== 'wishlist' && (!form.startDate || !form.endDate)) return t('addTrip.errors.fillTitleDates');
+    if (!!form.startDate !== !!form.endDate) return t('addTrip.errors.bothDates');
+    if (form.startDate && form.endDate < form.startDate) return t('addTrip.errors.dateOrder');
+    return '';
+  };
+
   const handleSubmit = async () => {
-    if (!form.title || !form.startDate || !form.endDate) {
-      setError(t('addTrip.errors.fillTitleDates'));
+    const problem = datesError();
+    if (problem) {
+      setError(problem);
       return;
     }
     setSaving(true);
@@ -72,6 +85,9 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, initialTrip }
     try {
       const formData = new FormData();
       formData.append('title', form.title);
+      formData.append('status', form.status);
+      formData.append('budget', form.budget);
+      formData.append('currency', form.currency);
       formData.append('description', form.description);
       formData.append('start_date', form.startDate);
       formData.append('end_date', form.endDate);
@@ -103,7 +119,8 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, initialTrip }
   const handleClose = () => { resetForm(); onClose(); };
 
   const goToStep2 = () => {
-    if (!form.title || !form.startDate || !form.endDate) { setError(t('addTrip.errors.fillTitleDates')); return; }
+    const problem = datesError();
+    if (problem) { setError(problem); return; }
     setError('');
     setStep(2);
   };

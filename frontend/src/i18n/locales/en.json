@@ -49,7 +49,8 @@
     "locations": "Locations"
   },
   "tripCard": {
-    "moreLocations": "+{{count}} more"
+    "moreLocations": "+{{count}} more",
+    "noDates": "No dates yet"
   },
   "emptyState": {
     "filteredTitle": "No trips match your filters",
@@ -82,11 +83,14 @@
     "tabs": {
       "map": "Map",
       "timeline": "Timeline",
-      "photos": "Photos"
+      "photos": "Photos",
+      "expenses": "Expenses"
     },
     "mapPanel": {
       "title": "Locations",
-      "empty": "No locations added yet."
+      "empty": "No locations added yet.",
+      "dragHint": "Drag ⋮⋮ to change the order of the route",
+      "dragHandle": "Move"
     },
     "uploadPhotos": "Upload photos or videos",
     "exportPdf": "Export PDF",
@@ -152,7 +156,12 @@
       "coverImage": "Cover Image",
       "coverDrop": "Drop an image or click to upload",
       "coverFormats": "JPG, PNG, WebP — max 10MB",
-      "dragToReposition": "Drag to reposition"
+      "dragToReposition": "Drag to reposition",
+      "startDateOptional": "Start date (optional)",
+      "endDateOptional": "End date (optional)",
+      "budget": "Budget (optional)",
+      "budgetPlaceholder": "e.g. 1500",
+      "currency": "Currency"
     },
     "locations": {
       "routeLabel": "Route ({{count}})",
@@ -178,7 +187,9 @@
     "errors": {
       "fillTitleDates": "Please fill in the title and dates.",
       "geocodingFailed": "Geocoding failed. Please enter coordinates manually.",
-      "saveFailed": "Failed to save trip. Please try again."
+      "saveFailed": "Failed to save trip. Please try again.",
+      "bothDates": "Give both dates or none.",
+      "dateOrder": "The end date can't be before the start date."
     },
     "saveChanges": "Save Changes",
     "saveTrip": "Save Trip"
@@ -263,5 +274,82 @@
       "pickTrip": "Choose the trip to add them to.",
       "failed": "Could not create or update the trip. Please try again."
     }
+  },
+  "tripStatus": {
+    "done": "Done",
+    "planned": "Planned",
+    "wishlist": "Wishlist",
+    "filter": {
+      "all": "All",
+      "done": "Done",
+      "planned": "Upcoming",
+      "wishlist": "Wishlist"
+    }
+  },
+  "worldMap": {
+    "title": "World map",
+    "visited_one": "country visited",
+    "visited_other": "countries visited",
+    "legendVisited": "Visited",
+    "legendPlanned": "Planned / wishlist"
+  },
+  "share": {
+    "menu": "Share link",
+    "manage": "Shared link",
+    "title": "Share trip",
+    "explain": "Anyone with the link can see this trip (map, timeline, photos and videos) without logging in. Private notes, expenses and the budget are not shown.",
+    "create": "Create link",
+    "copy": "Copy",
+    "copied": "Copied",
+    "revoke": "Turn the link off",
+    "invalid": "This link is no longer valid.",
+    "sharedTrip": "Shared trip"
+  },
+  "expenses": {
+    "summary": "Summary",
+    "budget": "Budget",
+    "over": "{{amount}} over budget",
+    "left": "{{amount}} left",
+    "perDay": "{{amount}} per day on average",
+    "add": "Add expense",
+    "edit": "Edit expense",
+    "delete": "Delete expense",
+    "amount": "Amount",
+    "description": "Description (optional)",
+    "noLocation": "No place",
+    "empty": "No expenses in this trip yet.",
+    "deleteConfirm": "Delete this expense?",
+    "categories": {
+      "transport": "Transport",
+      "lodging": "Lodging",
+      "food": "Food",
+      "activities": "Activities",
+      "shopping": "Shopping",
+      "other": "Other"
+    },
+    "errors": {
+      "amount": "Enter a valid amount.",
+      "save": "Could not save the expense."
+    }
+  },
+  "tracks": {
+    "title": "GPS tracks",
+    "upload": "Upload GPX/KML",
+    "empty": "Upload a GPX or KML file (from your watch, Strava, Wikiloc, Google My Maps…) to draw the route.",
+    "invalid": "The file has no tracks or is not a valid GPX/KML.",
+    "failed": "Could not upload the track.",
+    "deleteConfirm": "Delete the track \"{{name}}\"?",
+    "delete": "Delete track"
+  },
+  "backup": {
+    "title": "Backup",
+    "exportExplain": "Download a ZIP with every trip, photo and video (originals included).",
+    "export": "Download backup",
+    "restoreExplain": "Restoring a backup replaces all current trips with the ones in it. The current database is kept aside (pre-restore-…db) just in case.",
+    "restore": "Restore from ZIP",
+    "restoring": "Restoring… {{percent}}%",
+    "confirmRestore": "ALL trips will be replaced with the ones in \"{{name}}\". Continue?",
+    "restored": "Backup restored: {{trips}} trips and {{files}} files.",
+    "restoreFailed": "Could not restore the backup"
   }
 }

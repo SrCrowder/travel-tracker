@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Calendar, MapPin, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar, MapPin, Clock, Sparkles, CalendarClock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getImageUrl } from '../api/client';
 import { useDateLocale } from '../i18n/useDateLocale';
+import { formatTripRange, tripDays } from '../lib/tripDates';
 import type { Trip } from '../types';
 
 const TAG_COLORS: Record<string, string> = {
@@ -26,11 +26,8 @@ export default function TripCard({ trip }: TripCardProps) {
   const { t } = useTranslation();
   const dateLocale = useDateLocale();
 
-  const durationDays =
-    Math.ceil(
-      (new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) /
-        (1000 * 60 * 60 * 24)
-    ) + 1;
+  const durationDays = tripDays(trip);
+  const dateRange = formatTripRange(trip, dateLocale);
 
   const locationNames = trip.locations
     ?.slice(0, 3)
@@ -60,10 +57,20 @@ export default function TripCard({ trip }: TripCardProps) {
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
-            <Clock size={11} />
-            {durationDays}d
-          </div>
+          {durationDays !== null && (
+            <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
+              <Clock size={11} />
+              {durationDays}d
+            </div>
+          )}
+          {trip.status !== 'done' && (
+            <div className={`absolute top-3 left-3 flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold shadow-sm ${
+              trip.status === 'planned' ? 'bg-amber-400 text-amber-950' : 'bg-pink-500 text-white'
+            }`}>
+              {trip.status === 'planned' ? <CalendarClock size={11} /> : <Sparkles size={11} />}
+              {t(`tripStatus.${trip.status}`)}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -94,11 +101,7 @@ export default function TripCard({ trip }: TripCardProps) {
 
           <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-sm mb-1.5">
             <Calendar size={13} className="shrink-0" />
-            <span>
-              {format(new Date(trip.start_date), 'MMM d', { locale: dateLocale })}
-              {' – '}
-              {format(new Date(trip.end_date), 'MMM d, yyyy', { locale: dateLocale })}
-            </span>
+            <span>{dateRange ?? t('tripCard.noDates')}</span>
           </div>
 
           {trip.locations && trip.locations.length > 0 && (

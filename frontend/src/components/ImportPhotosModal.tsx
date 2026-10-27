@@ -155,7 +155,7 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
     setProgress({ done: 0, total: photos.length });
     const placeList = autoPlaces ? clusters : [];
     const newLocation = (c: PhotoCluster) => ({
-      name: c.name, country: c.country, lat: c.lat, lng: c.lng,
+      name: c.name, country: c.country, country_code: c.countryCode || null, lat: c.lat, lng: c.lng,
       date_start: c.dateStart ?? '', date_end: c.dateEnd ?? '', description: '', notes: '', rating: 0,
     });
 
@@ -185,8 +185,10 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
         const form = new FormData();
         const range = dateRange(photos);
         // Make the trip span the photos' dates
-        if (range && range.start < existing.start_date) form.append('start_date', range.start);
-        if (range && range.end > existing.end_date) form.append('end_date', range.end);
+        if (range && (!existing.start_date || range.start < existing.start_date)) form.append('start_date', range.start);
+        if (range && (!existing.end_date || range.end > existing.end_date)) form.append('end_date', range.end);
+        // Photos mean the trip happened (or is happening)
+        if (existing.status === 'wishlist' && range) form.append('status', 'done');
         form.append('new_locations', JSON.stringify(toCreate.map(newLocation)));
         targetTrip = (await tripsApi.update(existing.id, form)).data;
 
@@ -355,7 +357,7 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
                       <select value={tripId} onChange={(e) => setTripId(e.target.value ? Number(e.target.value) : '')} className={inputClass}>
                         <option value="">{t('importPhotos.pickTrip')}</option>
                         {trips.map((trip) => (
-                          <option key={trip.id} value={trip.id}>{trip.title} ({trip.start_date.slice(0, 4)})</option>
+                          <option key={trip.id} value={trip.id}>{trip.title}{trip.start_date ? ` (${trip.start_date.slice(0, 4)})` : ''}</option>
                         ))}
                       </select>
                       <p className="text-xs text-slate-400">{t('importPhotos.extendDates')}</p>

@@ -9,10 +9,12 @@ import type { Trip, Photo } from '../types';
 
 interface PhotoGalleryProps {
   trip: Trip;
-  onPhotoDeleted: () => void;
+  onPhotoDeleted?: () => void;
+  /** Shared page: no delete buttons */
+  readOnly?: boolean;
 }
 
-export default function PhotoGallery({ trip, onPhotoDeleted }: PhotoGalleryProps) {
+export default function PhotoGallery({ trip, onPhotoDeleted, readOnly }: PhotoGalleryProps) {
   const { t } = useTranslation();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [deletedPhotoIds, setDeletedPhotoIds] = useState<Set<number>>(new Set());
@@ -45,7 +47,7 @@ export default function PhotoGallery({ trip, onPhotoDeleted }: PhotoGalleryProps
     setDeletedPhotoIds((prev) => new Set([...prev, photo.id]));
     try {
       await photosApi.delete(photo.trip_id, photo.id);
-      onPhotoDeleted();
+      onPhotoDeleted?.();
     } catch {
       setDeletedPhotoIds((prev) => {
         const next = new Set(prev);
@@ -88,13 +90,13 @@ export default function PhotoGallery({ trip, onPhotoDeleted }: PhotoGalleryProps
               <p className="text-white text-xs line-clamp-1">{photo.caption}</p>
             </div>
           )}
-          <button
+          {!readOnly && <button
             onClick={(e) => { e.stopPropagation(); if (window.confirm(t('photoGallery.deleteConfirm'))) handleDeletePhoto(photo); }}
             title={t('photoGallery.deletePhoto')}
             className="absolute bottom-1.5 right-1.5 z-10 w-7 h-7 rounded-full bg-red-500/80 hover:bg-red-600 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <Trash2 size={13} />
-          </button>
+          </button>}
         </motion.div>
       ))}
     </div>

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Trip, Location, Photo } from '../types';
+import type { Trip, Location, Photo, Expense, Track } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
@@ -50,6 +50,49 @@ export const tripsApi = {
     }),
 
   delete: (id: number) => api.delete<{ message: string }>(`/trips/${id}`),
+
+  share: (id: number) => api.post<{ share_token: string }>(`/trips/${id}/share`),
+  unshare: (id: number) => api.delete<{ share_token: null }>(`/trips/${id}/share`),
+};
+
+// ─── Shared trips (public, read-only) ─────────────────────────────────────────
+export const publicApi = {
+  getTrip: (token: string) => api.get<Trip>(`/public/trips/${token}`),
+};
+
+// ─── Expenses ─────────────────────────────────────────────────────────────────
+export type ExpenseInput = Partial<Pick<Expense, 'date' | 'category' | 'description' | 'amount' | 'currency' | 'location_id'>>;
+
+export const expensesApi = {
+  list: (tripId: number) => api.get<Expense[]>(`/trips/${tripId}/expenses`),
+  create: (tripId: number, data: ExpenseInput) => api.post<Expense>(`/trips/${tripId}/expenses`, data),
+  update: (tripId: number, id: number, data: ExpenseInput) => api.put<Expense>(`/trips/${tripId}/expenses/${id}`, data),
+  delete: (tripId: number, id: number) => api.delete(`/trips/${tripId}/expenses/${id}`),
+};
+
+// ─── GPX / KML tracks ─────────────────────────────────────────────────────────
+export const tracksApi = {
+  upload: (tripId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<Track>(`/trips/${tripId}/tracks`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  delete: (tripId: number, id: number) => api.delete(`/trips/${tripId}/tracks/${id}`),
+};
+
+// ─── Backup ───────────────────────────────────────────────────────────────────
+export const backupApi = {
+  /** Plain link: the browser streams the ZIP to disk. */
+  downloadUrl: () => `${BASE_URL}/backup`,
+  restore: (file: File, onProgress?: (fraction: number) => void) => {
+    const form = new FormData();
+    form.append('backup', file);
+    return api.post<{ message: string; files: number; trips: number; previous_database: string }>('/backup/restore', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+      onUploadProgress: (e) => onProgress?.(e.total ? e.loaded / e.total : 0),
+    });
+  },
 };
 
 // ─── Locations ────────────────────────────────────────────────────────────────
@@ -101,7 +144,14 @@ export const geocode = async (query: string) => {
 };
 
 // ─── Image URL helpers ────────────────────────────────────────────────────────
+// A shared (read-only) trip page loads files through its share link instead
+let mediaPrefix: string | null = null;
+export const setSharedMediaToken = (token: string | null) => {
+  mediaPrefix = token ? `${BASE_URL}/public/${token}/media` : null;
+};
+
 export const getImageUrl = (filename: string): string => {
+  if (mediaPrefix) return `${mediaPrefix}/${filename}`;
   const base = import.meta.env.VITE_API_URL || '';
   return `${base}/uploads/${filename}`;
 };
@@ -113,7 +163,9 @@ export const thumbUrl = (photo: Photo): string => getImageUrl(photo.thumb_filena
 export const mediaUrl = (photo: Photo): string => getImageUrl(photo.filename);
 
 /** The file exactly as it was uploaded (HEIC, MOV…). */
-export const originalUrl = (photo: Photo): string => getImageUrl(photo.original_filename ?? photo.filename);
+export const originalUrl = (photo: Photo): string =>
+  // Share links only expose the browser-friendly files
+  getImageUrl(mediaPrefix ? photo.filename : photo.original_filename ?? photo.filename);
 
 /** Every photo/video of a trip: general ones plus each location's, in time order. */
 export const allMedia = (trip: Trip): Photo[] =>
