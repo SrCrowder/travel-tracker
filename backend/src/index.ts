@@ -11,8 +11,9 @@ import { authRouter, requireAuth, AUTH_ENABLED } from './middleware/auth';
 import { UPLOADS_DIR, uploadHeaders, removeUploadedFiles } from './middleware/upload';
 
 const app = express();
-// Behind nginx: lets req.ip / req.secure reflect the real client
-app.set('trust proxy', 1);
+// Behind nginx / a reverse proxy: only trust X-Forwarded-* from private
+// networks, so a client reaching the API directly can't fake its IP
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';

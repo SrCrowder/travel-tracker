@@ -76,27 +76,42 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ error: 'Authentication required' });
 }
 
-// ─── Brute-force protection: max failed logins per IP in a time window ───────
-const MAX_FAILURES = 10;
+// ─── Brute-force protection ──────────────────────────────────────────────────
+// Per-IP limit, plus a global one so rotating or spoofed IPs can't keep
+// guessing. A lockout only blocks logins; existing sessions keep working.
+const MAX_FAILURES_PER_IP = 10;
+const MAX_FAILURES_GLOBAL = 100;
 const FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const MAX_TRACKED_IPS = 10_000;
+const GLOBAL_KEY = '*';
 const failures = new Map<string, { count: number; first: number }>();
 
-function isLockedOut(ip: string): boolean {
-  const entry = failures.get(ip);
-  if (!entry) return false;
+function failureCount(key: string): number {
+  const entry = failures.get(key);
+  if (!entry) return 0;
   if (Date.now() - entry.first > FAILURE_WINDOW_MS) {
-    failures.delete(ip);
-    return false;
+    failures.delete(key);
+    return 0;
   }
-  return entry.count >= MAX_FAILURES;
+  return entry.count;
+}
+
+function isLockedOut(ip: string): boolean {
+  return failureCount(ip) >= MAX_FAILURES_PER_IP || failureCount(GLOBAL_KEY) >= MAX_FAILURES_GLOBAL;
 }
 
 function recordFailure(ip: string) {
-  const entry = failures.get(ip);
-  if (!entry || Date.now() - entry.first > FAILURE_WINDOW_MS) {
-    failures.set(ip, { count: 1, first: Date.now() });
-  } else {
-    entry.count++;
+  if (failures.size >= MAX_TRACKED_IPS) {
+    for (const key of failures.keys()) failureCount(key); // drops expired entries
+    if (failures.size >= MAX_TRACKED_IPS) failures.clear();
+  }
+  for (const key of [ip, GLOBAL_KEY]) {
+    const entry = failures.get(key);
+    if (!entry || Date.now() - entry.first > FAILURE_WINDOW_MS) {
+      failures.set(key, { count: 1, first: Date.now() });
+    } else {
+      entry.count++;
+    }
   }
 }
 

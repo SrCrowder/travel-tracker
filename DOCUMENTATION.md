@@ -384,7 +384,7 @@ When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/up
 | Method | Path | Body | Description |
 |---|---|---|---|
 | GET | `/api/auth/me` | — | `{ authRequired, authenticated }` |
-| POST | `/api/auth/login` | `{ username, password }` | Sets the `tt_session` cookie. `401` on wrong credentials, `429` after 10 failures in 15 min from the same IP |
+| POST | `/api/auth/login` | `{ username, password }` | Sets the `tt_session` cookie. `401` on wrong credentials, `429` after 10 failures in 15 min from the same IP, or 100 in total from all IPs (blocks new logins only; open sessions keep working) |
 | POST | `/api/auth/logout` | — | Clears the session cookie |
 
 ### Trips

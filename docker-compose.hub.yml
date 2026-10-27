@@ -21,8 +21,10 @@ services:
     image: ghcr.io/srcrowder/travel-tracker-backend:latest
     container_name: travel-tracker-api
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    # No published port: the frontend's nginx reaches the API over the internal
+    # Docker network (http://backend:3001). Uncomment only to debug the API.
+    # ports:
+    #   - "3001:3001"
     volumes:
       - /mnt/nvme/apps/travel-tracker/ddbb:/app/data
       - /mnt/nvme/apps/travel-tracker/uploads:/app/uploads
