@@ -111,7 +111,14 @@ router.post('/restore', restoreUpload.single('backup'), async (req: Request, res
         throw new Error('no trips table');
       }
       migrate(backupDb);
+      // File names end up in paths on disk: only plain names are acceptable
+      const names = backupDb.prepare(`
+        SELECT filename AS name FROM photos UNION ALL SELECT original_filename FROM photos
+        UNION ALL SELECT thumb_filename FROM photos UNION ALL SELECT cover_image FROM trips
+      `).all() as { name: string | null }[];
+      const unsafe = names.some(({ name }) => name !== null && !SAFE_NAME.test(name));
       backupDb.close();
+      if (unsafe) return res.status(400).json({ error: 'The backup contains invalid file names' });
     } catch {
       return res.status(400).json({ error: 'The backup database is not valid' });
     }

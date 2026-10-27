@@ -36,6 +36,20 @@ const KML = `<?xml version="1.0" encoding="UTF-8"?>
   <LineString><coordinates>12.5,41.9,0 12.6,41.9,0</coordinates></LineString>
 </Placemark></Document></kml>`;
 
+describe('cross-site requests', () => {
+  it('blocks writes coming from another website', async () => {
+    const res = await api.post('/api/trips').set('Origin', 'https://evil.example')
+      .field('title', 'x').field('start_date', '2024-01-01').field('end_date', '2024-01-02');
+    expect(res.status).toBe(403);
+    expect((await api.delete('/api/trips/1').set('Origin', 'https://evil.example')).status).toBe(403);
+    // Reading is fine, and so are same-origin writes
+    expect((await api.get('/api/trips').set('Origin', 'https://evil.example')).status).toBe(200);
+    const same = await api.post('/api/trips').set('Host', 'travel.local').set('Origin', 'https://travel.local')
+      .field('title', 'x').field('start_date', '2024-01-01').field('end_date', '2024-01-02');
+    expect(same.status).toBe(201);
+  });
+});
+
 describe('planned and wishlist trips', () => {
   it('lets wishlist trips have no dates, but not the others', async () => {
     const wish = await createTrip({ title: 'Japan someday', status: 'wishlist', start_date: '', end_date: '' });
@@ -200,6 +214,31 @@ describe('backup', () => {
     expect(back.photos[0].filename).toBe(photo.filename);
     expect(fs.existsSync(path.join(env.uploadsDir, photo.filename))).toBe(true);
     expect(fs.existsSync(path.join(env.dataDir, restored.body.previous_database))).toBe(true);
+  });
+
+  it('rejects a backup whose database points at files outside the uploads folder', async () => {
+    const Database = (await import('better-sqlite3')).default;
+    const { migrate } = await import('../src/database/migrations');
+    const dbPath = path.join(env.root, 'evil.db');
+    const evil = new Database(dbPath);
+    migrate(evil);
+    evil.exec(`INSERT INTO trips (title, start_date, end_date) VALUES ('x', '2024-01-01', '2024-01-02');
+      INSERT INTO photos (trip_id, filename, original_name, status, media_type, original_filename)
+      VALUES (1, '../../etc/cron.d/evil', 'x', 'processing', 'video', 'a.mov');`);
+    evil.close();
+
+    const zip = archiver('zip');
+    const chunks: Buffer[] = [];
+    zip.on('data', (c: Buffer) => chunks.push(c));
+    const done = new Promise((r) => zip.on('end', r));
+    zip.file(dbPath, { name: 'travel.db' });
+    await zip.finalize();
+    await done;
+
+    const before = (await api.get('/api/trips')).body.length;
+    const res = await api.post('/api/backup/restore').attach('backup', Buffer.concat(chunks), 'evil.zip');
+    expect(res.status).toBe(400);
+    expect((await api.get('/api/trips')).body.length).toBe(before);
   });
 
   it('ignores paths that try to escape the uploads folder and rejects non-backups', async () => {

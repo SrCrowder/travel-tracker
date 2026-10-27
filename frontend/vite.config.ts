@@ -44,11 +44,13 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
-        changeOrigin: true,
+        // Keep the browser's Host so the API's same-origin (CSRF) check passes
+        changeOrigin: false,
       },
       '/uploads': {
         target: 'http://localhost:3001',
-        changeOrigin: true,
+        // Keep the browser's Host so the API's same-origin (CSRF) check passes
+        changeOrigin: false,
       },
     },
   },

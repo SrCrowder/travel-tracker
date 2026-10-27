@@ -29,6 +29,20 @@ if (CLIENT_URL) {
   }));
 }
 
+// ─── CSRF: no cross-site writes ───────────────────────────────────────────────
+// Browsers send Origin on cross-origin writes. Another website must not be
+// able to change data here (the session cookie is SameSite=Lax, but with the
+// login disabled there is no cookie to rely on at all).
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const origin = req.headers.origin;
+  if (!origin || origin === CLIENT_URL) return next();
+  try {
+    if (new URL(origin).host === req.headers.host) return next();
+  } catch { /* malformed Origin */ }
+  res.status(403).json({ error: 'Cross-site request blocked' });
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

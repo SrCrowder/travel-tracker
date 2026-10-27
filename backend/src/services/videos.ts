@@ -166,4 +166,8 @@ export async function makePlayable(input: string, output: string, plan: Playback
   }
 }
 
-export const uploadPath = (filename: string) => path.join(UPLOADS_DIR, filename);
+export function uploadPath(filename: string): string {
+  // Names come from the database; never let one point outside the uploads folder
+  if (filename !== path.basename(filename) || filename.startsWith('.')) throw new Error(`Invalid file name: ${filename}`);
+  return path.join(UPLOADS_DIR, filename);
+}
