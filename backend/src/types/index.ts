@@ -1,10 +1,16 @@
 // Rows as stored in SQLite
+export type TripStatus = 'done' | 'planned' | 'wishlist';
+
 export interface TripRow {
   id: number;
   title: string;
   description: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | null; // null only for wishlist trips
+  end_date: string | null;
+  status: TripStatus;
+  share_token: string | null;
+  budget: number | null;
+  currency: string;
   cover_image: string | null;
   cover_position_x: number;
   cover_position_y: number;
@@ -17,6 +23,7 @@ export interface LocationRow {
   trip_id: number;
   name: string;
   country: string;
+  country_code: string | null; // ISO 3166-1 alpha-2, for the world map
   lat: number;
   lng: number;
   date_start: string | null;
@@ -50,6 +57,27 @@ export interface PhotoRow {
   created_at: string;
 }
 
+export interface ExpenseRow {
+  id: number;
+  trip_id: number;
+  location_id: number | null;
+  date: string | null;
+  category: string;
+  description: string;
+  amount: number;
+  currency: string;
+  created_at: string;
+}
+
+export interface TrackRow {
+  id: number;
+  trip_id: number;
+  name: string;
+  geojson: string; // FeatureCollection of LineStrings
+  distance_m: number;
+  created_at: string;
+}
+
 // Shapes returned by the API
 export interface Trip extends Omit<TripRow, 'tags'> {
   tags: string[];
@@ -59,7 +87,12 @@ export interface LocationWithPhotos extends LocationRow {
   photos: PhotoRow[];
 }
 
+export interface Track extends Omit<TrackRow, 'geojson'> {
+  geojson: unknown;
+}
+
 export interface TripWithRelations extends Trip {
   locations: LocationWithPhotos[];
   photos: PhotoRow[];
+  tracks: Track[];
 }

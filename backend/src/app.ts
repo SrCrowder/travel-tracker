@@ -4,6 +4,10 @@ import multer from 'multer';
 import tripsRouter from './routes/trips';
 import locationsRouter from './routes/locations';
 import photosRouter from './routes/photos';
+import expensesRouter from './routes/expenses';
+import tracksRouter from './routes/tracks';
+import publicRouter from './routes/public';
+import backupRouter from './routes/backup';
 import { authRouter, requireAuth } from './middleware/auth';
 import { removeUploadedFiles, uploadHeaders } from './middleware/upload';
 import { CLIENT_URL, UPLOADS_DIR } from './config';
@@ -28,8 +32,9 @@ if (CLIENT_URL) {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── Auth (public) ────────────────────────────────────────────────────────────
+// ─── Public: login and shared trips (read-only, by link) ─────────────────────
 app.use('/api/auth', authRouter);
+app.use('/api/public', publicRouter);
 
 // ─── Static files (uploaded images) ──────────────────────────────────────────
 app.use('/uploads', requireAuth, express.static(UPLOADS_DIR, { setHeaders: uploadHeaders }));
@@ -39,6 +44,9 @@ app.use('/api', requireAuth);
 app.use('/api/trips', tripsRouter);
 app.use('/api/trips/:tripId/locations', locationsRouter);
 app.use('/api/trips/:tripId/photos', photosRouter);
+app.use('/api/trips/:tripId/expenses', expensesRouter);
+app.use('/api/trips/:tripId/tracks', tracksRouter);
+app.use('/api/backup', backupRouter);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

@@ -5,7 +5,8 @@ import { processImage } from '../services/images';
 import { deleteMediaFiles } from '../services/storage';
 import type { ImageFormat } from '../services/media';
 import { getTrip, getTripRow, listTrips } from '../database/queries';
-import { tripCreateSchema, tripUpdateSchema, validate } from '../validation';
+import crypto from 'crypto';
+import { tripCreateSchema, tripDatesProblem, tripUpdateSchema, validate } from '../validation';
 import type { PhotoRow } from '../types';
 import { z } from 'zod';
 
@@ -15,13 +16,14 @@ type NewLocation = z.output<typeof tripCreateSchema>['new_locations'][number];
 
 function insertLocations(tripId: number | bigint, locations: NewLocation[], firstIndex: number) {
   const insertLocation = db.prepare(`
-    INSERT INTO locations (trip_id, name, country, lat, lng, date_start, date_end, description, notes, order_index, rating)
-    VALUES (@trip_id, @name, @country, @lat, @lng, @date_start, @date_end, @description, @notes, @order_index, @rating)
+    INSERT INTO locations (trip_id, name, country, country_code, lat, lng, date_start, date_end, description, notes, order_index, rating)
+    VALUES (@trip_id, @name, @country, @country_code, @lat, @lng, @date_start, @date_end, @description, @notes, @order_index, @rating)
   `);
   locations.forEach((loc, i) => insertLocation.run({
     trip_id: tripId,
     name: loc.name,
     country: loc.country,
+    country_code: loc.country_code ?? null,
     lat: loc.lat,
     lng: loc.lng,
     date_start: loc.date_start ?? null,
@@ -79,10 +81,11 @@ router.post('/', upload.single('cover_image'), verifyMedia(['image']), async (re
     cover = await prepareCover(req);
     const tripId = db.transaction(() => {
       const result = db.prepare(`
-        INSERT INTO trips (title, description, start_date, end_date, cover_image, tags, cover_position_x, cover_position_y)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO trips (title, description, start_date, end_date, cover_image, tags, cover_position_x, cover_position_y,
+                           status, budget, currency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(body.title, body.description, body.start_date, body.end_date, cover,
-        JSON.stringify(body.tags), body.cover_position_x, body.cover_position_y);
+        JSON.stringify(body.tags), body.cover_position_x, body.cover_position_y, body.status, body.budget, body.currency);
       insertLocations(result.lastInsertRowid, body.new_locations, 0);
       return result.lastInsertRowid;
     })();
@@ -105,11 +108,14 @@ router.put('/:id', upload.single('cover_image'), verifyMedia(['image']), async (
   const body = validate(tripUpdateSchema, req.body, res);
   if (!body) return removeUploadedFiles(req);
 
-  const startDate = body.start_date ?? existing.start_date;
-  const endDate = body.end_date ?? existing.end_date;
-  if (endDate < startDate) {
+  // undefined = unchanged, null = cleared (wishlist)
+  const startDate = body.start_date !== undefined ? body.start_date : existing.start_date;
+  const endDate = body.end_date !== undefined ? body.end_date : existing.end_date;
+  const status = body.status ?? existing.status;
+  const datesProblem = tripDatesProblem({ status, start_date: startDate, end_date: endDate });
+  if (datesProblem) {
     removeUploadedFiles(req);
-    return res.status(400).json({ error: 'Invalid data', details: ['end_date: must not be before start_date'] });
+    return res.status(400).json({ error: 'Invalid data', details: [`end_date: ${datesProblem}`] });
   }
 
   let newCover: string | null = null;
@@ -127,7 +133,7 @@ router.put('/:id', upload.single('cover_image'), verifyMedia(['image']), async (
       db.prepare(`
         UPDATE trips
         SET title = ?, description = ?, start_date = ?, end_date = ?, cover_image = ?, tags = ?,
-            cover_position_x = ?, cover_position_y = ?
+            cover_position_x = ?, cover_position_y = ?, status = ?, budget = ?, currency = ?
         WHERE id = ?
       `).run(
         body.title ?? existing.title,
@@ -138,6 +144,9 @@ router.put('/:id', upload.single('cover_image'), verifyMedia(['image']), async (
         body.tags ? JSON.stringify(body.tags) : existing.tags,
         body.cover_position_x ?? existing.cover_position_x ?? 50,
         body.cover_position_y ?? existing.cover_position_y ?? 50,
+        status,
+        body.budget !== undefined ? body.budget : existing.budget,
+        body.currency ?? existing.currency,
         existing.id,
       );
 
@@ -159,6 +168,21 @@ router.put('/:id', upload.single('cover_image'), verifyMedia(['image']), async (
   // Only touch the disk once the database change is committed
   if (replacingCover && existing.cover_image !== coverImage) deleteUpload(existing.cover_image);
   res.json(getTrip(existing.id));
+});
+
+// ─── Share link (read-only public page) ──────────────────────────────────────
+router.post('/:id/share', (req: Request, res: Response) => {
+  const trip = getTripRow(req.params.id);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  const token = trip.share_token ?? crypto.randomBytes(18).toString('base64url');
+  db.prepare('UPDATE trips SET share_token = ? WHERE id = ?').run(token, trip.id);
+  res.json({ share_token: token });
+});
+
+router.delete('/:id/share', (req: Request, res: Response) => {
+  const result = db.prepare('UPDATE trips SET share_token = NULL WHERE id = ?').run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Trip not found' });
+  res.json({ share_token: null });
 });
 
 // ─── DELETE trip ─────────────────────────────────────────────────────────────

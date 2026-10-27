@@ -28,9 +28,14 @@ export const tagsSchema = jsonField(
 );
 
 // ─── Locations ────────────────────────────────────────────────────────────────
+const countryCode = z.preprocess(emptyToNull,
+  z.string().regex(/^[A-Za-z]{2}$/, 'expected a 2-letter country code').transform((c) => c.toUpperCase()).nullable());
+const currency = z.string().regex(/^[A-Za-z]{3}$/, 'expected a 3-letter currency code').transform((c) => c.toUpperCase());
+
 const locationFields = {
   name: z.string().trim().min(1).max(200),
   country: z.string().trim().max(100),
+  country_code: countryCode,
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
   date_start: optionalDate,
@@ -54,6 +59,7 @@ export const locationCreateSchema = z.object({
   notes: longText.default(''),
   rating: locationFields.rating.optional(),
   order_index: locationFields.order_index.optional(),
+  country_code: countryCode.optional(),
 }).refine(datesInOrder, dateOrderIssue);
 
 export const locationUpdateSchema = z.object(locationFields).partial().refine(datesInOrder, dateOrderIssue);
@@ -65,11 +71,17 @@ export const reorderSchema = z.object({
 // ─── Trips ────────────────────────────────────────────────────────────────────
 const coverPosition = z.coerce.number().min(0).max(100);
 
+export const TRIP_STATUSES = ['done', 'planned', 'wishlist'] as const;
+
 const tripFields = {
   title: z.string().trim().min(1).max(200),
   description: longText,
-  start_date: isoDate,
-  end_date: isoDate,
+  // Wishlist trips may have no dates yet
+  start_date: z.preprocess(emptyToNull, isoDate.nullable()),
+  end_date: z.preprocess(emptyToNull, isoDate.nullable()),
+  status: z.enum(TRIP_STATUSES),
+  budget: z.preprocess(emptyToNull, z.coerce.number().min(0).max(1e9).nullable()),
+  currency,
   tags: tagsSchema,
   cover_position_x: coverPosition,
   cover_position_y: coverPosition,
@@ -77,14 +89,30 @@ const tripFields = {
   new_locations: jsonField(z.array(locationCreateSchema).max(500)),
 };
 
+/** Dates are required unless the trip is a wishlist one, and must be in order. */
+export function tripDatesProblem(d: { status: string; start_date: string | null; end_date: string | null }): string | null {
+  if (d.status !== 'wishlist' && (!d.start_date || !d.end_date)) return 'start_date and end_date are required';
+  if (!!d.start_date !== !!d.end_date) return 'give both start_date and end_date, or neither';
+  if (d.start_date && d.end_date && d.end_date < d.start_date) return 'end_date must not be before start_date';
+  return null;
+}
+
 export const tripCreateSchema = z.object({
   ...tripFields,
   description: longText.default(''),
+  start_date: tripFields.start_date.default(null),
+  end_date: tripFields.end_date.default(null),
+  status: tripFields.status.default('done'),
+  budget: tripFields.budget.default(null),
+  currency: currency.default('EUR'),
   tags: tripFields.tags.default([]),
   cover_position_x: coverPosition.default(50),
   cover_position_y: coverPosition.default(50),
   new_locations: tripFields.new_locations.default([]),
-}).refine((d) => d.end_date >= d.start_date, { message: 'end_date must not be before start_date', path: ['end_date'] });
+}).superRefine((d, ctx) => {
+  const problem = tripDatesProblem(d);
+  if (problem) ctx.addIssue({ code: 'custom', message: problem, path: ['end_date'] });
+});
 
 export const tripUpdateSchema = z.object({
   ...tripFields,
@@ -92,7 +120,28 @@ export const tripUpdateSchema = z.object({
   removed_location_ids: jsonField(z.array(id).max(500)).default([]),
   remove_cover: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
 }).partial({ title: true, description: true, start_date: true, end_date: true, tags: true,
-  cover_position_x: true, cover_position_y: true });
+  cover_position_x: true, cover_position_y: true, status: true, budget: true, currency: true });
+
+// ─── Expenses ─────────────────────────────────────────────────────────────────
+export const EXPENSE_CATEGORIES = ['transport', 'lodging', 'food', 'activities', 'shopping', 'other'] as const;
+
+const expenseFields = {
+  date: optionalDate,
+  category: z.enum(EXPENSE_CATEGORIES),
+  description: z.string().trim().max(500),
+  amount: z.coerce.number().min(0).max(1e9),
+  currency,
+  location_id: z.preprocess(emptyToNull, id.nullable()).optional(),
+};
+
+export const expenseCreateSchema = z.object({
+  ...expenseFields,
+  category: expenseFields.category.default('other'),
+  description: expenseFields.description.default(''),
+  currency: currency.optional(), // defaults to the trip's currency
+});
+
+export const expenseUpdateSchema = z.object(expenseFields).partial();
 
 // ─── Photos ───────────────────────────────────────────────────────────────────
 export const photoUploadSchema = z.object({

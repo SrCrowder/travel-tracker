@@ -22,6 +22,14 @@ describe('auth', () => {
     expect((await request(app).get('/health')).status).toBe(200);
   });
 
+  it('keeps share links and the backup behind the right doors', async () => {
+    // Share links work without logging in (unknown token → 404, not 401)…
+    expect((await request(app).get('/api/public/trips/nope')).status).toBe(404);
+    // …but creating them, and backups, need a session
+    expect((await request(app).post('/api/trips/1/share')).status).toBe(401);
+    expect((await request(app).get('/api/backup')).status).toBe(401);
+  });
+
   it('rejects wrong credentials', async () => {
     const res = await login('nope', '10.0.0.2');
     expect(res.status).toBe(401);

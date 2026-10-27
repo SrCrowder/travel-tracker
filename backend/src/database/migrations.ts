@@ -80,6 +80,66 @@ const migrations: Array<(db: Database) => void> = [
       CREATE INDEX IF NOT EXISTS idx_photos_taken_at ON photos(trip_id, taken_at);
     `);
   },
+
+  // 3 — planned / wishlist trips (wishlist trips may have no dates, so the
+  //     table is rebuilt to drop NOT NULL), share links, budget, country codes
+  //     for the world map, expenses and GPX/KML tracks.
+  (db) => {
+    db.exec(`
+      CREATE TABLE trips_new (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        title            TEXT    NOT NULL,
+        description      TEXT    DEFAULT '',
+        start_date       TEXT,
+        end_date         TEXT,
+        cover_image      TEXT,
+        tags             TEXT    DEFAULT '[]',
+        created_at       TEXT    DEFAULT (datetime('now')),
+        cover_position_x REAL    DEFAULT 50,
+        cover_position_y REAL    DEFAULT 50,
+        status           TEXT    NOT NULL DEFAULT 'done' CHECK (status IN ('done', 'planned', 'wishlist')),
+        share_token      TEXT    UNIQUE,
+        budget           REAL,
+        currency         TEXT    NOT NULL DEFAULT 'EUR'
+      );
+      INSERT INTO trips_new (id, title, description, start_date, end_date, cover_image, tags, created_at,
+                             cover_position_x, cover_position_y)
+        SELECT id, title, description, start_date, end_date, cover_image, tags, created_at,
+               COALESCE(cover_position_x, 50), COALESCE(cover_position_y, 50)
+        FROM trips;
+      DROP TABLE trips;
+      ALTER TABLE trips_new RENAME TO trips;
+      CREATE INDEX idx_trips_start_date ON trips(start_date);
+
+      -- Trips that haven't started yet are "planned"
+      UPDATE trips SET status = 'planned' WHERE start_date > date('now');
+
+      ALTER TABLE locations ADD COLUMN country_code TEXT;
+
+      CREATE TABLE expenses (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        trip_id     INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+        date        TEXT,
+        category    TEXT    NOT NULL DEFAULT 'other',
+        description TEXT    NOT NULL DEFAULT '',
+        amount      REAL    NOT NULL,
+        currency    TEXT    NOT NULL DEFAULT 'EUR',
+        created_at  TEXT    DEFAULT (datetime('now'))
+      );
+      CREATE INDEX idx_expenses_trip_id ON expenses(trip_id);
+
+      CREATE TABLE tracks (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        trip_id     INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        name        TEXT    NOT NULL DEFAULT '',
+        geojson     TEXT    NOT NULL,
+        distance_m  REAL    NOT NULL DEFAULT 0,
+        created_at  TEXT    DEFAULT (datetime('now'))
+      );
+      CREATE INDEX idx_tracks_trip_id ON tracks(trip_id);
+    `);
+  },
 ];
 
 export const SCHEMA_VERSION = migrations.length;
@@ -91,11 +151,24 @@ export function migrate(db: Database): boolean {
   if (current > migrations.length) {
     throw new Error(`Database schema v${current} is newer than this app (v${migrations.length})`);
   }
-  for (let v = current; v < migrations.length; v++) {
-    db.transaction(() => {
-      migrations[v](db);
-      db.pragma(`user_version = ${v + 1}`);
-    })();
+  if (current === migrations.length) return fresh;
+
+  // Foreign keys must be off while tables are rebuilt (DROP TABLE would
+  // otherwise cascade-delete their children); integrity is checked instead
+  // before each migration commits. The pragma is a no-op inside a transaction.
+  const fkWasOn = db.pragma('foreign_keys', { simple: true }) === 1;
+  db.pragma('foreign_keys = OFF');
+  try {
+    for (let v = current; v < migrations.length; v++) {
+      db.transaction(() => {
+        migrations[v](db);
+        const problems = db.pragma('foreign_key_check') as unknown[];
+        if (problems.length) throw new Error(`Migration ${v + 1} broke ${problems.length} foreign key(s)`);
+        db.pragma(`user_version = ${v + 1}`);
+      })();
+    }
+  } finally {
+    if (fkWasOn) db.pragma('foreign_keys = ON');
   }
   return fresh;
 }

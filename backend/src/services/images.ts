@@ -52,10 +52,18 @@ export interface ProcessedImage extends MediaMetadata {
 }
 
 const THUMB_SIZE = 480;
+// Largest image we decode (iPhones shoot 12–48 MP)
+const MAX_PIXELS = 100_000_000;
 
 async function decodeToJpeg(buffer: Buffer, format: ImageFormat): Promise<Buffer> {
   if (format === 'heic') {
-    // sharp's bundled libvips can't decode HEVC, so decode with libheif (wasm)
+    // sharp's bundled libvips can't decode HEVC, so decode with libheif (wasm).
+    // That bypasses sharp's pixel limit, so check the size from the header first
+    // (a tiny file can claim a huge image and exhaust memory when decoded).
+    const header = await sharp(buffer).metadata();
+    if (!header.width || !header.height || header.width * header.height > MAX_PIXELS) {
+      throw new Error(`HEIC image too large or unreadable (${header.width}x${header.height})`);
+    }
     const { width, height, data } = await heicDecode({ buffer });
     return sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } })
       .jpeg({ quality: 90, mozjpeg: true })

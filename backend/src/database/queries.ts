@@ -1,5 +1,5 @@
 import db from './db';
-import type { TripRow, LocationRow, PhotoRow, Trip, LocationWithPhotos, TripWithRelations } from '../types';
+import type { TripRow, LocationRow, PhotoRow, Trip, LocationWithPhotos, TripWithRelations, TrackRow, Track } from '../types';
 
 // ─── Shared SQL fragments ─────────────────────────────────────────────────────
 const PHOTO_COLUMNS = ['id', 'location_id', 'trip_id', 'media_type', 'status', 'filename', 'original_filename',
@@ -8,7 +8,7 @@ const PHOTO_COLUMNS = ['id', 'location_id', 'trip_id', 'media_type', 'status', '
 
 // Chronological: when it was taken, falling back to when it was uploaded
 export const MEDIA_ORDER = 'COALESCE(taken_at, created_at), id';
-const LOCATION_COLUMNS = ['id', 'trip_id', 'name', 'country', 'lat', 'lng', 'date_start', 'date_end',
+const LOCATION_COLUMNS = ['id', 'trip_id', 'name', 'country', 'country_code', 'lat', 'lng', 'date_start', 'date_end',
   'description', 'notes', 'order_index', 'rating'];
 
 const jsonObject = (alias: string, columns: string[]) =>
@@ -51,7 +51,7 @@ export function listTrips(): Array<Trip & { locations: LocationRow[] }> {
   const rows = db.prepare(`
     SELECT t.*, ${TRIP_LOCATIONS_JSON} AS locations_json
     FROM trips t
-    ORDER BY t.start_date DESC
+    ORDER BY t.start_date IS NULL, t.start_date DESC, t.id DESC
   `).all() as Array<TripRow & { locations_json: string }>;
 
   return rows.map(({ locations_json, ...row }) => ({
@@ -77,7 +77,12 @@ export function getTrip(id: number | string): TripWithRelations | undefined {
   const photos = db.prepare(
     `SELECT * FROM photos WHERE trip_id = ? AND location_id IS NULL ORDER BY ${MEDIA_ORDER}`
   ).all(id) as PhotoRow[];
-  return { ...toTrip(row), locations: listLocations(id), photos };
+  return { ...toTrip(row), locations: listLocations(id), photos, tracks: listTracks(row.id) };
+}
+
+export function listTracks(tripId: number): Track[] {
+  const rows = db.prepare('SELECT * FROM tracks WHERE trip_id = ? ORDER BY created_at, id').all(tripId) as TrackRow[];
+  return rows.map((t) => ({ ...t, geojson: JSON.parse(t.geojson) }));
 }
 
 export function getLocation(tripId: number | string, locationId: number | string): LocationRow | undefined {

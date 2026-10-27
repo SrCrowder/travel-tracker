@@ -23,10 +23,10 @@ router.post('/', (req: Request, res: Response) => {
   ).get(req.params.tripId) as { next: number };
 
   const result = db.prepare(`
-    INSERT INTO locations (trip_id, name, country, lat, lng, date_start, date_end, description, notes, order_index, rating)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO locations (trip_id, name, country, country_code, lat, lng, date_start, date_end, description, notes, order_index, rating)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    req.params.tripId, body.name, body.country, body.lat, body.lng,
+    req.params.tripId, body.name, body.country, body.country_code ?? null, body.lat, body.lng,
     body.date_start ?? null, body.date_end ?? null, body.description, body.notes,
     body.order_index ?? next, body.rating ?? null,
   );
@@ -49,7 +49,7 @@ router.put('/:locationId', (req: Request, res: Response) => {
 
   db.prepare(`
     UPDATE locations
-    SET name = @name, country = @country, lat = @lat, lng = @lng, date_start = @date_start, date_end = @date_end,
+    SET name = @name, country = @country, country_code = @country_code, lat = @lat, lng = @lng, date_start = @date_start, date_end = @date_end,
         description = @description, notes = @notes, order_index = @order_index, rating = @rating
     WHERE id = @id AND trip_id = @trip_id
   `).run(merged);
