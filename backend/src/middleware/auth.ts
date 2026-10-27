@@ -78,13 +78,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 // ─── Brute-force protection ──────────────────────────────────────────────────
 // Per-IP limit, plus a global one so rotating or spoofed IPs can't keep
-// guessing. A lockout only blocks logins; existing sessions keep working.
+// guessing. IPs that logged in successfully before skip the global limit, so
+// an attacker can't lock the owner out. Existing sessions always keep working.
 const MAX_FAILURES_PER_IP = 10;
 const MAX_FAILURES_GLOBAL = 100;
 const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 const MAX_TRACKED_IPS = 10_000;
 const GLOBAL_KEY = '*';
 const failures = new Map<string, { count: number; first: number }>();
+const knownIps = new Map<string, number>(); // ip -> last successful login
+const MAX_KNOWN_IPS = 1000;
 
 function failureCount(key: string): number {
   const entry = failures.get(key);
@@ -97,7 +100,17 @@ function failureCount(key: string): number {
 }
 
 function isLockedOut(ip: string): boolean {
-  return failureCount(ip) >= MAX_FAILURES_PER_IP || failureCount(GLOBAL_KEY) >= MAX_FAILURES_GLOBAL;
+  if (failureCount(ip) >= MAX_FAILURES_PER_IP) return true;
+  const lastLogin = knownIps.get(ip);
+  if (lastLogin && Date.now() - lastLogin < SESSION_MS) return false;
+  return failureCount(GLOBAL_KEY) >= MAX_FAILURES_GLOBAL;
+}
+
+function recordSuccess(ip: string) {
+  failures.delete(ip);
+  knownIps.delete(ip); // re-insert so the oldest entry is evicted first
+  knownIps.set(ip, Date.now());
+  if (knownIps.size > MAX_KNOWN_IPS) knownIps.delete(knownIps.keys().next().value!);
 }
 
 function recordFailure(ip: string) {
@@ -138,7 +151,7 @@ authRouter.post('/login', (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  failures.delete(ip);
+  recordSuccess(ip);
   res.cookie(COOKIE_NAME, createToken(), {
     httpOnly: true,
     sameSite: 'lax',
