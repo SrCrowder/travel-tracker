@@ -14,18 +14,18 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
+# Drop dev deps; better-sqlite3 stays compiled for this same base image
+RUN npm prune --omit=dev
+
 
 # ─── Stage 2: Production image ────────────────────────────────────────────────
+# No build tools here: the compiled node_modules come from the build stage
 FROM node:20-alpine
-
-# Keep build tools — needed to compile better-sqlite3 native bindings
-RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
 COPY package*.json ./
-# Install only production deps (this recompiles better-sqlite3 for this stage)
-RUN npm install --omit=dev
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy compiled JS from build stage
 COPY --from=builder /app/dist ./dist

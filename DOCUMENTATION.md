@@ -11,7 +11,7 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 3. [Project Structure](#3-project-structure)
 4. [Running Locally (Dev Mode)](#4-running-locally-dev-mode)
 5. [Running Locally with Docker](#5-running-locally-with-docker)
-6. [Deploying to a Server (Docker Hub)](#6-deploying-to-a-server-docker-hub)
+6. [Deploying to a Server (GitHub Container Registry)](#6-deploying-to-a-server-github-container-registry)
 7. [Environment Variables](#7-environment-variables)
 8. [Database Schema](#8-database-schema)
 9. [REST API Reference](#9-rest-api-reference)
@@ -80,7 +80,7 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 |---|---|
 | nginx | Serves built frontend; proxies `/api/` and `/uploads/` to backend |
 | Docker + Docker Compose | Containerisation |
-| Docker Hub | Image registry (`srcrowder/travel-tracker-*`) |
+| GitHub Actions + ghcr.io | Builds and publishes the images (`ghcr.io/srcrowder/travel-tracker-*`) |
 
 ---
 
@@ -89,7 +89,8 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 ```
 travel-tracker/
 ├── docker-compose.yml          # Local build (builds images from source)
-├── docker-compose.hub.yml      # Production (pulls pre-built images from Docker Hub)
+├── docker-compose.hub.yml      # Production (pulls pre-built images from ghcr.io)
+├── .github/workflows/ghcr.yml  # Builds and publishes both images on every push to main
 ├── .env.example                # Reference for environment variables
 │
 ├── backend/
@@ -103,7 +104,8 @@ travel-tracker/
 │       │   ├── schema.ts       # Table definitions + migrations (ALTER TABLE)
 │       │   └── seed.ts         # Seeds example data if DB is empty
 │       ├── middleware/
-│       │   └── upload.ts       # Multer config (50 MB limit, UUID filenames)
+│       │   ├── auth.ts         # Optional login (WEB_USER / WEB_PASSWORD), session cookie
+│       │   └── upload.ts       # Multer config (10 MB/file, UUID filenames, image content check)
 │       ├── routes/
 │       │   ├── trips.ts        # CRUD for trips, cover image upload
 │       │   ├── locations.ts    # CRUD for locations within a trip
@@ -149,6 +151,7 @@ travel-tracker/
         ├── hooks/
         │   └── useTripPdfExport.tsx    # Fetches images as base64, renders PDF, downloads
         ├── pages/
+        │   ├── Login.tsx       # Login page (only shown when WEB_PASSWORD is set)
         │   ├── Dashboard.tsx   # Home page: trip list, stats, search, filter
         │   └── TripDetail.tsx  # Single trip: map, timeline, photos tabs
         ├── store/
@@ -200,7 +203,7 @@ Vite proxies `/api/` and `/uploads/` to `localhost:3001` automatically (configur
 
 ## 5. Running Locally with Docker
 
-Builds both images from source and starts the full stack. Good for testing production behaviour before pushing to Docker Hub.
+Builds both images from source and starts the full stack. Good for testing production behaviour before pushing to `main`.
 
 ```bash
 cd travel-tracker
@@ -228,18 +231,24 @@ docker compose -f docker-compose.yml down
 
 ---
 
-## 6. Deploying to a Server (Docker Hub)
+## 6. Deploying to a Server (GitHub Container Registry)
 
-### Step 1 — Build and push from your dev machine
+### How images are published
+
+Every push to `main` runs `.github/workflows/ghcr.yml`, which builds both images and pushes them to GitHub Container Registry:
+
+- `ghcr.io/srcrowder/travel-tracker-backend`
+- `ghcr.io/srcrowder/travel-tracker-frontend`
+
+Tags: `:latest`, `:AAAA.MM.DD` and `:sha-<commit>` on every push to `main`; `:X.Y.Z` and `:X.Y` when you push a `vX.Y.Z` git tag. It can also be started by hand from the **Actions** tab → *Publicar imagen en ghcr.io* → *Run workflow*. There's nothing to build or push from your machine.
+
+### Step 1 — First-time server setup (volumes)
+
+The containers need these host directories to exist before starting:
 
 ```bash
-cd travel-tracker
-
-docker build -t srcrowder/travel-tracker-backend:latest ./backend
-docker push srcrowder/travel-tracker-backend:latest
-
-docker build -t srcrowder/travel-tracker-frontend:latest ./frontend
-docker push srcrowder/travel-tracker-frontend:latest
+mkdir -p /mnt/nvme/apps/travel-tracker/{ddbb,uploads}
+chmod -R 777 /mnt/nvme/apps/travel-tracker
 ```
 
 ### Step 2 — Deploy on the server
@@ -251,25 +260,11 @@ docker compose -f docker-compose.hub.yml pull
 docker compose -f docker-compose.hub.yml up -d
 ```
 
-### Step 3 — First-time server setup (volumes)
-
-The containers need these host directories to exist before starting:
-
-```bash
-mkdir -p /mnt/nvme/apps/travel-tracker/{ddbb,uploads}
-chmod -R 777 /mnt/nvme/apps/travel-tracker
-```
-
 ### Updating the app
 
-```bash
-# On dev machine
-docker build -t srcrowder/travel-tracker-backend:latest ./backend
-docker build -t srcrowder/travel-tracker-frontend:latest ./frontend
-docker push srcrowder/travel-tracker-backend:latest
-docker push srcrowder/travel-tracker-frontend:latest
+Push to `main`, wait for the workflow to finish (Actions tab), then on the server:
 
-# On server
+```bash
 docker compose -f docker-compose.hub.yml pull
 docker compose -f docker-compose.hub.yml up -d
 ```
@@ -299,7 +294,11 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 |---|---|---|
 | `PORT` | `3001` | Port the Express server listens on |
 | `NODE_ENV` | `development` | `production` disables verbose errors |
-| `CLIENT_URL` | `http://localhost:5173` | Allowed CORS origin. Use `*` in Docker Hub compose to allow any origin |
+| `CLIENT_URL` | `http://localhost:5173` | Allowed CORS origin. Use `*` in the server compose to allow any origin |
+| `WEB_USER` | `admin` | Login username (only used when `WEB_PASSWORD` is set) |
+| `WEB_PASSWORD` | *(empty)* | Set it to require a login for the whole app (API and photos). Empty = no login, fine on a private LAN |
+| `SESSION_DAYS` | `30` | How long a login lasts |
+| `SESSION_SECRET` | *(auto)* | Key that signs session cookies. If unset, a random one is created in `data/session.secret`. Changing `WEB_PASSWORD` logs everyone out |
 
 ### Frontend (Vite build-time only)
 
@@ -316,7 +315,7 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 SQLite file lives at:
 - **Dev:** `backend/data/travel.db` (created automatically)
 - **Docker local:** `./docker-data/db/travel.db`
-- **Docker Hub / server:** `/mnt/nvme/apps/travel-tracker/ddbb/travel.db`
+- **Server (`docker-compose.hub.yml`):** `/mnt/nvme/apps/travel-tracker/ddbb/travel.db`
 
 ### Tables
 
@@ -378,6 +377,16 @@ This runs on every startup and is idempotent.
 
 Base URL: `http://localhost:3001` (dev) or via nginx proxy `/api/` (production)
 
+When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/uploads/*` returns `401` without a valid session cookie.
+
+### Auth
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/api/auth/me` | — | `{ authRequired, authenticated }` |
+| POST | `/api/auth/login` | `{ username, password }` | Sets the `tt_session` cookie. `401` on wrong credentials, `429` after 10 failures in 15 min from the same IP |
+| POST | `/api/auth/logout` | — | Clears the session cookie |
+
 ### Trips
 
 | Method | Path | Body | Description |
@@ -390,7 +399,7 @@ Base URL: `http://localhost:3001` (dev) or via nginx proxy `/api/` (production)
 
 **Form fields for POST/PUT:**
 - `title`, `description`, `start_date`, `end_date` (strings)
-- `tags` (JSON string e.g. `'["beach","food"]'`)
+- `tags` (JSON array of strings e.g. `'["beach","food"]'`; max 20 tags of up to 40 characters, anything else returns `400`)
 - `cover_image` (file, optional)
 - `cover_position_x`, `cover_position_y` (numbers 0–100, optional)
 - `remove_cover` (`'true'` string, PUT only — removes existing cover)
@@ -415,7 +424,7 @@ Base URL: `http://localhost:3001` (dev) or via nginx proxy `/api/` (production)
 | DELETE | `/api/trips/:tripId/photos/:id` | — | Delete photo (removes file from disk) |
 
 **Upload form fields:**
-- `photos` (one or more files)
+- `photos` (one or more files: jpg, png, webp or gif, max 10 MB each, 20 per request. The stored extension comes from the detected type and the file content is checked, so non-images are rejected with `400`)
 - `location_id` (number, optional — omit for general trip photo)
 - `caption` (string, optional — applied to all uploaded files)
 
@@ -581,10 +590,10 @@ Most likely causes:
 
 ### App calls localhost:3001 instead of server
 
-The frontend image was built without an empty `VITE_API_URL`. Rebuild with the current Dockerfile (the default is now empty):
+The frontend image was built without an empty `VITE_API_URL`. The images published by GitHub Actions always use an empty value; pull the latest one:
 ```bash
-docker build -t srcrowder/travel-tracker-frontend:latest ./frontend
-docker push srcrowder/travel-tracker-frontend:latest
+docker compose -f docker-compose.hub.yml pull
+docker compose -f docker-compose.hub.yml up -d
 ```
 
 ### Uploaded images return 404

@@ -26,7 +26,7 @@ export function useTripPdfExport() {
       await Promise.all(
         [...filenames].map(async (filename) => {
           try {
-            const res = await fetch(getImageUrl(filename));
+            const res = await fetch(getImageUrl(filename), { credentials: 'include' });
             if (!res.ok) return;
             const blob = await res.blob();
             const dataUrl = await new Promise<string>((resolve, reject) => {

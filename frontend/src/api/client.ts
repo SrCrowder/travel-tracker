@@ -8,7 +8,30 @@ const BASE_URL = import.meta.env.VITE_API_URL
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 30_000,
+  withCredentials: true, // session cookie when the API is on another origin
 });
+
+// A 401 outside /auth means the session expired: tell the app to show the login
+export const AUTH_EXPIRED_EVENT = 'travel-tracker:auth-expired';
+api.interceptors.response.use(undefined, (error) => {
+  if (error.response?.status === 401 && !error.config?.url?.startsWith('/auth/')) {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
+  return Promise.reject(error);
+});
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export interface AuthStatus {
+  authRequired: boolean;
+  authenticated: boolean;
+}
+
+export const authApi = {
+  me: () => api.get<AuthStatus>('/auth/me'),
+  login: (username: string, password: string) =>
+    api.post<AuthStatus>('/auth/login', { username, password }),
+  logout: () => api.post<AuthStatus>('/auth/logout'),
+};
 
 // ─── Trips ────────────────────────────────────────────────────────────────────
 export const tripsApi = {

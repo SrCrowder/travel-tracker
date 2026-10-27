@@ -197,5 +197,17 @@
       "noFile": "Please select at least one photo.",
       "uploadFailed": "Upload failed. Please try again."
     }
+  },
+  "auth": {
+    "title": "Sign in",
+    "subtitle": "Enter your credentials to see your trips",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "invalid": "Wrong username or password",
+    "tooMany": "Too many failed attempts. Try again later.",
+    "error": "Could not sign in",
+    "logout": "Sign out"
   }
 }

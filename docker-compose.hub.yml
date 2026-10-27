@@ -1,7 +1,12 @@
-# ─── Travel Tracker — pre-built images from Docker Hub ───────────────────────
+# ─── Travel Tracker — pre-built images from GitHub (ghcr.io) ──────────────────
 #
 # Usage:
+#   docker compose -f docker-compose.hub.yml pull
 #   docker compose -f docker-compose.hub.yml up -d
+#
+# Images are built and published by GitHub Actions on every push to main
+# (.github/workflows/ghcr.yml). Pin a version with :AAAA.MM.DD or :sha-xxxxxxx
+# instead of :latest if you want to control updates.
 #
 # The frontend uses relative URLs — nginx proxies /api/ and /uploads/ to the
 # backend internally, so this works on any IP or domain without rebuilding.
@@ -13,7 +18,7 @@ services:
 
   # ── API (Node + Express + SQLite) ─────────────────────────────────────────
   backend:
-    image: srcrowder/travel-tracker-backend:latest
+    image: ghcr.io/srcrowder/travel-tracker-backend:latest
     container_name: travel-tracker-api
     restart: unless-stopped
     ports:
@@ -25,6 +30,9 @@ services:
       NODE_ENV: production
       PORT: 3001
       CLIENT_URL: "*"
+      # Optional: require a login (username/password) to use the app
+      # WEB_USER: admin
+      # WEB_PASSWORD: change-me
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 15s
@@ -38,7 +46,7 @@ services:
 
   # ── Frontend (React + nginx) ───────────────────────────────────────────────
   frontend:
-    image: srcrowder/travel-tracker-frontend:latest
+    image: ghcr.io/srcrowder/travel-tracker-frontend:latest
     container_name: travel-tracker-ui
     restart: unless-stopped
     ports:

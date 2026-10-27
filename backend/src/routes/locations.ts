@@ -78,7 +78,8 @@ router.post('/', (req: Request, res: Response) => {
 // ─── PUT update location ──────────────────────────────────────────────────────
 router.put('/:locationId', (req: Request, res: Response) => {
   try {
-    const existing = db.prepare('SELECT * FROM locations WHERE id = ?').get(req.params.locationId) as Location | undefined;
+    const existing = db.prepare('SELECT * FROM locations WHERE id = ? AND trip_id = ?')
+      .get(req.params.locationId, req.params.tripId) as Location | undefined;
     if (!existing) return res.status(404).json({ error: 'Location not found' });
 
     const { name, country, lat, lng, date_start, date_end, description, notes, order_index, rating } = req.body;
@@ -87,7 +88,7 @@ router.put('/:locationId', (req: Request, res: Response) => {
       UPDATE locations
       SET name = ?, country = ?, lat = ?, lng = ?, date_start = ?, date_end = ?,
           description = ?, notes = ?, order_index = ?, rating = ?
-      WHERE id = ?
+      WHERE id = ? AND trip_id = ?
     `).run(
       name ?? existing.name,
       country ?? existing.country,
@@ -100,6 +101,7 @@ router.put('/:locationId', (req: Request, res: Response) => {
       order_index !== undefined ? Number(order_index) : existing.order_index,
       rating !== undefined ? (rating ? Number(rating) : null) : existing.rating,
       req.params.locationId,
+      req.params.tripId,
     );
 
     const updated = db.prepare('SELECT * FROM locations WHERE id = ?').get(req.params.locationId);
@@ -113,10 +115,10 @@ router.put('/:locationId', (req: Request, res: Response) => {
 // ─── DELETE location ──────────────────────────────────────────────────────────
 router.delete('/:locationId', (req: Request, res: Response) => {
   try {
-    const existing = db.prepare('SELECT * FROM locations WHERE id = ?').get(req.params.locationId);
-    if (!existing) return res.status(404).json({ error: 'Location not found' });
+    const result = db.prepare('DELETE FROM locations WHERE id = ? AND trip_id = ?')
+      .run(req.params.locationId, req.params.tripId);
+    if (result.changes === 0) return res.status(404).json({ error: 'Location not found' });
 
-    db.prepare('DELETE FROM locations WHERE id = ?').run(req.params.locationId);
     res.json({ message: 'Location deleted' });
   } catch (err) {
     console.error(err);

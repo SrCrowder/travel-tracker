@@ -197,5 +197,17 @@
       "noFile": "Selecciona al menos una foto.",
       "uploadFailed": "Error al subir. Inténtalo de nuevo."
     }
+  },
+  "auth": {
+    "title": "Inicia sesión",
+    "subtitle": "Introduce tus credenciales para ver tus viajes",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "submit": "Entrar",
+    "submitting": "Entrando…",
+    "invalid": "Usuario o contraseña incorrectos",
+    "tooMany": "Demasiados intentos fallidos. Inténtalo más tarde.",
+    "error": "No se pudo iniciar sesión",
+    "logout": "Cerrar sesión"
   }
 }

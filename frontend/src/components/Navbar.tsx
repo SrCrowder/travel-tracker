@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Compass, X } from 'lucide-react';
+import { Search, Plus, Compass, X, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { authApi, type AuthStatus } from '../api/client';
 import DarkModeToggle from './DarkModeToggle';
 import { useStore } from '../store/useStore';
 import i18n from '../i18n';
@@ -18,6 +20,15 @@ export default function Navbar({ onAddTrip }: NavbarProps) {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  // Already fetched by App — read from the cache
+  const { data: auth } = useQuery<AuthStatus>({ queryKey: ['auth'], enabled: false });
+
+  const handleLogout = async () => {
+    await authApi.logout();
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
+    queryClient.setQueryData<AuthStatus>(['auth'], { authRequired: true, authenticated: false });
+  };
 
   // Global keyboard shortcut: Cmd/Ctrl+K to focus search
   useEffect(() => {
@@ -113,6 +124,17 @@ export default function Navbar({ onAddTrip }: NavbarProps) {
             </div>
 
             <DarkModeToggle />
+
+            {auth?.authRequired && (
+              <button
+                onClick={handleLogout}
+                title={t('auth.logout')}
+                aria-label={t('auth.logout')}
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+              >
+                <LogOut size={18} />
+              </button>
+            )}
 
             {onAddTrip && (
               <motion.button

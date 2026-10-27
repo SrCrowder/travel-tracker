@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import db from '../database/db';
-import upload, { UPLOADS_DIR } from '../middleware/upload';
+import upload, { UPLOADS_DIR, verifyImages, removeUploadedFiles } from '../middleware/upload';
 
 const router = Router({ mergeParams: true });
 
@@ -30,10 +30,13 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // ─── POST upload photos ───────────────────────────────────────────────────────
-router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
+router.post('/', upload.array('photos', 20), verifyImages, (req: Request, res: Response) => {
   try {
     const trip = db.prepare('SELECT id FROM trips WHERE id = ?').get(req.params.tripId);
-    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    if (!trip) {
+      removeUploadedFiles(req);
+      return res.status(404).json({ error: 'Trip not found' });
+    }
 
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
@@ -47,7 +50,10 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     if (locationId) {
       const loc = db.prepare('SELECT id FROM locations WHERE id = ? AND trip_id = ?')
         .get(locationId, req.params.tripId);
-      if (!loc) return res.status(400).json({ error: 'Location does not belong to this trip' });
+      if (!loc) {
+        removeUploadedFiles(req);
+        return res.status(400).json({ error: 'Location does not belong to this trip' });
+      }
     }
 
     const insertPhoto = db.prepare(`
@@ -70,6 +76,7 @@ router.post('/', upload.array('photos', 20), (req: Request, res: Response) => {
     res.status(201).json(photos);
   } catch (err) {
     console.error(err);
+    removeUploadedFiles(req);
     res.status(500).json({ error: 'Failed to upload photos' });
   }
 });
@@ -100,8 +107,7 @@ router.delete('/:photoId', (req: Request, res: Response) => {
     if (!photo) return res.status(404).json({ error: 'Photo not found' });
 
     // Remove file from disk
-    const filePath = path.join(UPLOADS_DIR, photo.filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    fs.rmSync(path.join(UPLOADS_DIR, photo.filename), { force: true });
 
     db.prepare('DELETE FROM photos WHERE id = ?').run(req.params.photoId);
     res.json({ message: 'Photo deleted' });
