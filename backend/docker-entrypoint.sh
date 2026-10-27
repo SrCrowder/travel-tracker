@@ -6,7 +6,8 @@ set -e
 # first. Only files with another owner are touched, so restarts stay fast.
 if [ "$(id -u)" = "0" ]; then
   for dir in /app/data /app/uploads; do
-    find "$dir" ! -user node -exec chown node:node {} + 2>/dev/null || true
+    # Only real files/dirs on this volume, never following symlinks
+    find "$dir" -xdev \( -type f -o -type d \) ! -user node -exec chown -h node:node {} + 2>/dev/null || true
   done
   exec su-exec node "$@"
 fi
