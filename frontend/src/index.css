@@ -1,0 +1,235 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Leaflet overrides ────────────────────────────────────────────────────── */
+@import 'leaflet/dist/leaflet.css';
+
+.leaflet-container {
+  font-family: 'Inter', sans-serif !important;
+  border-radius: 1rem;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+  border: none !important;
+}
+
+.leaflet-popup-tip {
+  box-shadow: none !important;
+}
+
+/* ─── React-Calendar overrides ─────────────────────────────────────────────── */
+.react-calendar {
+  width: 100% !important;
+  border: none !important;
+  border-radius: 1rem !important;
+  font-family: 'Inter', sans-serif !important;
+  background: transparent !important;
+  line-height: 1.5 !important;
+}
+
+.react-calendar__navigation {
+  height: 40px !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.react-calendar__navigation button {
+  min-width: 36px !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.875rem !important;
+  color: inherit !important;
+}
+
+.react-calendar__navigation button:hover,
+.react-calendar__navigation button:focus {
+  background-color: rgba(79, 70, 229, 0.1) !important;
+}
+
+.react-calendar__month-view__weekdays {
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #94a3b8 !important;
+}
+
+.react-calendar__month-view__weekdays abbr {
+  text-decoration: none !important;
+}
+
+.react-calendar__tile {
+  border-radius: 0.5rem !important;
+  font-size: 0.8125rem !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: inherit !important;
+  transition: all 0.15s ease !important;
+}
+
+.react-calendar__tile:hover {
+  background-color: rgba(79, 70, 229, 0.1) !important;
+}
+
+.react-calendar__tile--active,
+.react-calendar__tile--active:hover {
+  background: #4F46E5 !important;
+  color: white !important;
+}
+
+.react-calendar__tile--now {
+  background: rgba(79, 70, 229, 0.08) !important;
+  font-weight: 600 !important;
+}
+
+.react-calendar__tile--hasActive {
+  background: #4F46E5 !important;
+  color: white !important;
+}
+
+/* Trip-highlighted dates */
+.calendar-trip-day {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #92400E !important;
+  font-weight: 600 !important;
+  position: relative;
+}
+
+.dark .calendar-trip-day {
+  background: rgba(245, 158, 11, 0.25) !important;
+  color: #FCD34D !important;
+}
+
+.calendar-trip-day::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #F59E0B;
+}
+
+/* ─── Global base styles ───────────────────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-warm-50 text-slate-800 font-inter antialiased;
+    min-height: 100vh;
+  }
+
+  .dark body {
+    @apply bg-slate-900 text-slate-100;
+  }
+}
+
+/* ─── Custom utilities ─────────────────────────────────────────────────────── */
+@layer utilities {
+  .font-playfair {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .font-inter {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── Smooth page transitions ──────────────────────────────────────────────── */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+/* ─── Photo grid hover effect ──────────────────────────────────────────────── */
+.photo-grid-item {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  cursor: pointer;
+}
+
+.photo-grid-item img {
+  transition: transform 0.4s ease;
+}
+
+.photo-grid-item:hover img {
+  transform: scale(1.05);
+}
+
+/* ─── Map marker custom styles ─────────────────────────────────────────────── */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.marker-pin {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.marker-pin:hover {
+  transform: scale(1.15);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.marker-pin.selected {
+  background: #F59E0B !important;
+  border-color: #D97706 !important;
+  transform: scale(1.2);
+  box-shadow: 0 5px 20px rgba(245, 158, 11, 0.5);
+}

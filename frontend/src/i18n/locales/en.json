@@ -1,0 +1,201 @@
+{
+  "common": {
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "clear": "clear",
+    "loading": "Loading…",
+    "uploading": "Uploading…",
+    "new": "new"
+  },
+  "nav": {
+    "title": "My Travel Log",
+    "searchPlaceholder": "Search trips, places… (⌘K)",
+    "newTrip": "New Trip"
+  },
+  "darkMode": {
+    "toLight": "Switch to light mode",
+    "toDark": "Switch to dark mode"
+  },
+  "dashboard": {
+    "heading": "Your Journey",
+    "subtitleEmpty": "Start documenting your travels",
+    "subtitleCount_one": "{{count}} adventure · {{year}}",
+    "subtitleCount_other": "{{count}} adventures · {{year}}",
+    "loading": "Loading your adventures…"
+  },
+  "filterBar": {
+    "label": "Filter",
+    "clearFilters": "Clear",
+    "newTrip": "New Trip"
+  },
+  "tags": {
+    "adventure": "Adventure",
+    "food": "Food",
+    "hiking": "Hiking",
+    "culture": "Culture",
+    "beach": "Beach",
+    "city": "City",
+    "nature": "Nature"
+  },
+  "stats": {
+    "adventures": "Adventures",
+    "countries": "Countries",
+    "daysTravelled": "Days Travelled",
+    "locations": "Locations"
+  },
+  "tripCard": {
+    "moreLocations": "+{{count}} more"
+  },
+  "emptyState": {
+    "filteredTitle": "No trips match your filters",
+    "filteredBody": "Try adjusting your search or filter options to find more adventures.",
+    "emptyTitle": "Your journey starts here",
+    "emptyBody": "Start documenting your travels — add your first trip to see it come alive on the map.",
+    "addFirst": "Add Your First Trip"
+  },
+  "map": {
+    "straightLine": "Straight line",
+    "roads": "Roads"
+  },
+  "calendar": {
+    "title": "Travel Calendar",
+    "tripDays": "Trip days"
+  },
+  "tripDetail": {
+    "allTrips": "All Trips",
+    "editTrip": "Edit Trip",
+    "deleteTrip": "Delete Trip",
+    "deleteConfirm": "Delete \"{{title}}\"? This cannot be undone.",
+    "loading": "Loading trip…",
+    "notFound": "Trip not found.",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "locations_one": "{{count}} location",
+    "locations_other": "{{count}} locations",
+    "tabs": {
+      "map": "Map",
+      "timeline": "Timeline",
+      "photos": "Photos"
+    },
+    "mapPanel": {
+      "title": "Locations",
+      "empty": "No locations added yet."
+    },
+    "uploadPhotos": "Upload Photos",
+    "exportPdf": "Export PDF",
+    "exportingPdf": "Exporting…"
+  },
+  "pdf": {
+    "locations": "Locations",
+    "photos": "Photos",
+    "notes": "NOTES",
+    "footer": "My Travel Log"
+  },
+  "locationPanel": {
+    "notes": "Notes",
+    "addPhotos": "Add photos to this location",
+    "addMorePhotos": "Add more photos ({{count}} existing)",
+    "editTitle": "Edit location",
+    "cancelEditTitle": "Cancel edit",
+    "deletePhoto": "Delete this photo",
+    "form": {
+      "name": "Name",
+      "country": "Country",
+      "lat": "Lat",
+      "lng": "Lng",
+      "dateStart": "Date Start",
+      "dateEnd": "Date End",
+      "description": "Description",
+      "descriptionPlaceholder": "What did you do here?",
+      "notes": "Notes",
+      "notesPlaceholder": "Private notes about this place…",
+      "rating": "Rating",
+      "clearRating": "clear"
+    }
+  },
+  "timeline": {
+    "day": "Day {{number}}",
+    "departure": "Departure",
+    "return": "Return",
+    "travelDay": "Travel day",
+    "photos_one": "📷 {{count}} photo — click to view",
+    "photos_other": "📷 {{count}} photos — click to view"
+  },
+  "photoGallery": {
+    "generalPhotos": "General Photos",
+    "noPhotos": "No photos uploaded yet for this trip.",
+    "deletePhoto": "Delete photo",
+    "deleteConfirm": "Delete this photo? This cannot be undone."
+  },
+  "addTrip": {
+    "titleCreate": "New Trip",
+    "titleLocations": "Add Locations",
+    "titleEdit": "Edit Trip",
+    "step": "Step {{step}} of 2",
+    "fields": {
+      "tripTitle": "Trip Title *",
+      "tripTitlePlaceholder": "e.g. Cherry Blossoms in Japan",
+      "startDate": "Start Date *",
+      "endDate": "End Date *",
+      "description": "Description",
+      "descriptionPlaceholder": "What made this trip special?",
+      "tags": "Tags",
+      "coverImage": "Cover Image",
+      "coverDrop": "Drop an image or click to upload",
+      "coverFormats": "JPG, PNG, WebP — max 10MB",
+      "dragToReposition": "Drag to reposition"
+    },
+    "locations": {
+      "routeLabel": "Route ({{count}})",
+      "searchLabel": "Search Location",
+      "searchPlaceholder": "Search a place name…",
+      "searchButton": "Search",
+      "name": "Name *",
+      "namePlaceholder": "Location name",
+      "country": "Country",
+      "countryPlaceholder": "e.g. Japan",
+      "lat": "Lat *",
+      "lng": "Lng *",
+      "dateStart": "Date Start",
+      "dateEnd": "Date End",
+      "description": "Description",
+      "descriptionPlaceholder": "What did you do here?",
+      "notes": "Notes",
+      "notesPlaceholder": "Private notes about this place…",
+      "rating": "Rating",
+      "addToRoute": "Add to Route",
+      "manageLater": "Locations can also be managed later on the trip page."
+    },
+    "errors": {
+      "fillTitleDates": "Please fill in the title and dates.",
+      "geocodingFailed": "Geocoding failed. Please enter coordinates manually.",
+      "saveFailed": "Failed to save trip. Please try again."
+    },
+    "saveChanges": "Save Changes",
+    "saveTrip": "Save Trip"
+  },
+  "uploadPhotos": {
+    "title": "Upload Photos",
+    "dropIdle": "Drop photos or click to browse",
+    "dropActive": "Drop photos here…",
+    "dropHint": "JPG, PNG, WebP, GIF — max 10 MB each",
+    "attachLabel": "Attach to Location",
+    "generalOption": "General trip photo (Photos tab only)",
+    "locationHint": "Location photos appear in the <strong>map panel</strong> and <strong>timeline</strong>. General photos only appear in the <strong>Photos tab</strong>.",
+    "captionLabel": "Caption",
+    "captionOptional": "(optional)",
+    "captionPlaceholder": "Add a caption for all selected photos…",
+    "noPhotos": "No photos selected",
+    "ready_one": "{{count}} photo ready",
+    "ready_other": "{{count}} photos ready",
+    "uploadButton_one": "Upload {{count}} Photo",
+    "uploadButton_other": "Upload {{count}} Photos",
+    "errors": {
+      "noFile": "Please select at least one photo.",
+      "uploadFailed": "Upload failed. Please try again."
+    }
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "common": {
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "clear": "borrar",
+    "loading": "Cargando…",
+    "uploading": "Subiendo…",
+    "new": "nuevo"
+  },
+  "nav": {
+    "title": "Mi Diario de Viajes",
+    "searchPlaceholder": "Buscar viajes, lugares… (⌘K)",
+    "newTrip": "Nuevo viaje"
+  },
+  "darkMode": {
+    "toLight": "Cambiar a modo claro",
+    "toDark": "Cambiar a modo oscuro"
+  },
+  "dashboard": {
+    "heading": "Mis Viajes",
+    "subtitleEmpty": "Empieza a documentar tus aventuras",
+    "subtitleCount_one": "{{count}} aventura · {{year}}",
+    "subtitleCount_other": "{{count}} aventuras · {{year}}",
+    "loading": "Cargando tus aventuras…"
+  },
+  "filterBar": {
+    "label": "Filtrar",
+    "clearFilters": "Limpiar",
+    "newTrip": "Nuevo viaje"
+  },
+  "tags": {
+    "adventure": "Aventura",
+    "food": "Gastronomía",
+    "hiking": "Senderismo",
+    "culture": "Cultura",
+    "beach": "Playa",
+    "city": "Ciudad",
+    "nature": "Naturaleza"
+  },
+  "stats": {
+    "adventures": "Aventuras",
+    "countries": "Países",
+    "daysTravelled": "Días de viaje",
+    "locations": "Ubicaciones"
+  },
+  "tripCard": {
+    "moreLocations": "+{{count}} más"
+  },
+  "emptyState": {
+    "filteredTitle": "Ningún viaje coincide con los filtros",
+    "filteredBody": "Prueba a ajustar la búsqueda o los filtros para encontrar más aventuras.",
+    "emptyTitle": "Tu aventura empieza aquí",
+    "emptyBody": "Empieza a documentar tus viajes: añade tu primer viaje y verás cómo cobra vida en el mapa.",
+    "addFirst": "Añadir tu primer viaje"
+  },
+  "map": {
+    "straightLine": "Línea recta",
+    "roads": "Carreteras"
+  },
+  "calendar": {
+    "title": "Calendario de viajes",
+    "tripDays": "Días de viaje"
+  },
+  "tripDetail": {
+    "allTrips": "Todos los viajes",
+    "editTrip": "Editar viaje",
+    "deleteTrip": "Eliminar viaje",
+    "deleteConfirm": "¿Eliminar «{{title}}»? Esta acción no se puede deshacer.",
+    "loading": "Cargando viaje…",
+    "notFound": "Viaje no encontrado.",
+    "days_one": "{{count}} día",
+    "days_other": "{{count}} días",
+    "locations_one": "{{count}} ubicación",
+    "locations_other": "{{count}} ubicaciones",
+    "tabs": {
+      "map": "Mapa",
+      "timeline": "Cronología",
+      "photos": "Fotos"
+    },
+    "mapPanel": {
+      "title": "Ubicaciones",
+      "empty": "Aún no hay ubicaciones."
+    },
+    "uploadPhotos": "Subir fotos",
+    "exportPdf": "Exportar PDF",
+    "exportingPdf": "Exportando…"
+  },
+  "pdf": {
+    "locations": "Ubicaciones",
+    "photos": "Fotos",
+    "notes": "NOTAS",
+    "footer": "Mi Diario de Viajes"
+  },
+  "locationPanel": {
+    "notes": "Notas",
+    "addPhotos": "Añadir fotos a esta ubicación",
+    "addMorePhotos": "Añadir más fotos ({{count}} existentes)",
+    "editTitle": "Editar ubicación",
+    "cancelEditTitle": "Cancelar edición",
+    "deletePhoto": "Eliminar esta foto",
+    "form": {
+      "name": "Nombre",
+      "country": "País",
+      "lat": "Lat",
+      "lng": "Lng",
+      "dateStart": "Fecha de inicio",
+      "dateEnd": "Fecha de fin",
+      "description": "Descripción",
+      "descriptionPlaceholder": "¿Qué hiciste aquí?",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas privadas sobre este lugar…",
+      "rating": "Valoración",
+      "clearRating": "borrar"
+    }
+  },
+  "timeline": {
+    "day": "Día {{number}}",
+    "departure": "Salida",
+    "return": "Regreso",
+    "travelDay": "Día de tránsito",
+    "photos_one": "📷 {{count}} foto — clic para ver",
+    "photos_other": "📷 {{count}} fotos — clic para ver"
+  },
+  "photoGallery": {
+    "generalPhotos": "Fotos generales",
+    "noPhotos": "Aún no hay fotos para este viaje.",
+    "deletePhoto": "Eliminar foto",
+    "deleteConfirm": "¿Eliminar esta foto? Esta acción no se puede deshacer."
+  },
+  "addTrip": {
+    "titleCreate": "Nuevo viaje",
+    "titleLocations": "Añadir ubicaciones",
+    "titleEdit": "Editar viaje",
+    "step": "Paso {{step}} de 2",
+    "fields": {
+      "tripTitle": "Título del viaje *",
+      "tripTitlePlaceholder": "p. ej. Cerezos en flor en Japón",
+      "startDate": "Fecha de inicio *",
+      "endDate": "Fecha de fin *",
+      "description": "Descripción",
+      "descriptionPlaceholder": "¿Qué hizo especial este viaje?",
+      "tags": "Etiquetas",
+      "coverImage": "Imagen de portada",
+      "coverDrop": "Arrastra una imagen o haz clic para subir",
+      "coverFormats": "JPG, PNG, WebP — máx. 10 MB",
+      "dragToReposition": "Arrastra para reposicionar"
+    },
+    "locations": {
+      "routeLabel": "Ruta ({{count}})",
+      "searchLabel": "Buscar ubicación",
+      "searchPlaceholder": "Busca un lugar…",
+      "searchButton": "Buscar",
+      "name": "Nombre *",
+      "namePlaceholder": "Nombre del lugar",
+      "country": "País",
+      "countryPlaceholder": "p. ej. España",
+      "lat": "Lat *",
+      "lng": "Lng *",
+      "dateStart": "Fecha de inicio",
+      "dateEnd": "Fecha de fin",
+      "description": "Descripción",
+      "descriptionPlaceholder": "¿Qué hiciste aquí?",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas privadas sobre este lugar…",
+      "rating": "Valoración",
+      "addToRoute": "Añadir a la ruta",
+      "manageLater": "Las ubicaciones también se pueden gestionar más tarde en la página del viaje."
+    },
+    "errors": {
+      "fillTitleDates": "Por favor, rellena el título y las fechas.",
+      "geocodingFailed": "No se pudo obtener la ubicación. Introduce las coordenadas manualmente.",
+      "saveFailed": "No se pudo guardar el viaje. Inténtalo de nuevo."
+    },
+    "saveChanges": "Guardar cambios",
+    "saveTrip": "Guardar viaje"
+  },
+  "uploadPhotos": {
+    "title": "Subir fotos",
+    "dropIdle": "Arrastra fotos o haz clic para explorar",
+    "dropActive": "Suelta las fotos aquí…",
+    "dropHint": "JPG, PNG, WebP, GIF — máx. 10 MB por foto",
+    "attachLabel": "Asociar a ubicación",
+    "generalOption": "Foto general del viaje (solo en la pestaña Fotos)",
+    "locationHint": "Las fotos de ubicación aparecen en el <strong>mapa</strong> y la <strong>cronología</strong>. Las fotos generales solo aparecen en la pestaña <strong>Fotos</strong>.",
+    "captionLabel": "Pie de foto",
+    "captionOptional": "(opcional)",
+    "captionPlaceholder": "Añade un pie de foto para todas las fotos seleccionadas…",
+    "noPhotos": "Ninguna foto seleccionada",
+    "ready_one": "{{count}} foto lista",
+    "ready_other": "{{count}} fotos listas",
+    "uploadButton_one": "Subir {{count}} foto",
+    "uploadButton_other": "Subir {{count}} fotos",
+    "errors": {
+      "noFile": "Selecciona al menos una foto.",
+      "uploadFailed": "Error al subir. Inténtalo de nuevo."
+    }
+  }
+}

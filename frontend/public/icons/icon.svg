@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="110" fill="#4F46E5"/>
+  <!-- Map-pin: teardrop body -->
+  <path d="M256 108c-79.5 0-144 64.5-144 144 0 54 32 100 70 138 24 24 50 48 74 68 24-20 50-44 74-68 38-38 70-84 70-138 0-79.5-64.5-144-144-144z" fill="white"/>
+  <!-- Map-pin: inner circle (hole) -->
+  <circle cx="256" cy="252" r="52" fill="#4F46E5"/>
+</svg>

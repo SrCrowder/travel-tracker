@@ -1,0 +1,623 @@
+# Travel Tracker — Documentation
+
+Personal travel diary web application. Log trips, locations, photos, and notes. View everything on an interactive map with timeline and calendar views. Export trips as PDF keepsakes.
+
+---
+
+## Table of Contents
+
+1. [Features](#1-features)
+2. [Tech Stack](#2-tech-stack)
+3. [Project Structure](#3-project-structure)
+4. [Running Locally (Dev Mode)](#4-running-locally-dev-mode)
+5. [Running Locally with Docker](#5-running-locally-with-docker)
+6. [Deploying to a Server (Docker Hub)](#6-deploying-to-a-server-docker-hub)
+7. [Environment Variables](#7-environment-variables)
+8. [Database Schema](#8-database-schema)
+9. [REST API Reference](#9-rest-api-reference)
+10. [Adding a New Language](#10-adding-a-new-language)
+11. [Adding Features — Key Patterns](#11-adding-features--key-patterns)
+12. [Data Backup & Reset](#12-data-backup--reset)
+13. [Common Problems & Fixes](#13-common-problems--fixes)
+
+---
+
+## 1. Features
+
+| Feature | Description |
+|---|---|
+| Trip management | Create, edit, delete trips with title, dates, description, tags, cover photo |
+| Cover photo reposition | Drag to set the focal point of the cover image (shown in cards and hero) |
+| Locations | Add locations to a trip with coordinates, dates, star rating, description, private notes |
+| Interactive map | react-leaflet map with numbered markers; toggle between straight-line and road routing (OSRM) |
+| Timeline view | Day-by-day breakdown of each trip with photos |
+| Photo gallery | Upload, view in lightbox, and delete photos; attach to a location or the trip generally |
+| Travel calendar | Calendar view highlighting days with active trips |
+| Stats bar | Totals: adventures, countries, days travelled, locations |
+| Search | Command-palette style search (⌘K / Ctrl+K) across all trips and locations |
+| Tag filtering | Filter trips by tag (adventure, food, hiking, culture, beach, city, nature) |
+| Dark mode | Toggleable; persisted in localStorage |
+| Language selector | Spanish (default) and English; persisted in localStorage |
+| Export PDF | Downloads a formatted travel journal PDF with cover page, locations, notes, and photos |
+| PWA | Installable as a home screen app on Android/Chrome |
+
+---
+
+## 2. Tech Stack
+
+### Backend
+| Package | Role |
+|---|---|
+| Node.js + Express | REST API server |
+| TypeScript | Type safety |
+| better-sqlite3 | SQLite database (single file, no server needed) |
+| multer | File upload handling |
+| uuid | Unique filenames for uploaded photos |
+| dotenv | Environment variable loading |
+
+### Frontend
+| Package | Role |
+|---|---|
+| React 18 + TypeScript | UI framework |
+| Vite | Build tool and dev server |
+| Tailwind CSS | Utility-first styling |
+| Framer Motion | Animations |
+| TanStack Query v5 | Server state management (caching, refetching) |
+| Zustand | Client state (dark mode, language) — persisted via localStorage |
+| react-router-dom v6 | Client-side routing |
+| react-leaflet + Leaflet | Interactive maps |
+| react-dropzone | Drag-and-drop file uploads |
+| react-calendar | Calendar component |
+| date-fns | Date formatting and locale |
+| i18next + react-i18next | Internationalisation |
+| lucide-react | Icons |
+| @react-pdf/renderer | Client-side PDF generation (lazy-loaded ~2 MB chunk) |
+| vite-plugin-pwa | PWA manifest and service worker generation |
+| axios | HTTP client |
+
+### Infrastructure
+| Tool | Role |
+|---|---|
+| nginx | Serves built frontend; proxies `/api/` and `/uploads/` to backend |
+| Docker + Docker Compose | Containerisation |
+| Docker Hub | Image registry (`srcrowder/travel-tracker-*`) |
+
+---
+
+## 3. Project Structure
+
+```
+travel-tracker/
+├── docker-compose.yml          # Local build (builds images from source)
+├── docker-compose.hub.yml      # Production (pulls pre-built images from Docker Hub)
+├── .env.example                # Reference for environment variables
+│
+├── backend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── index.ts            # Express app entry point, startup
+│       ├── database/
+│       │   ├── db.ts           # SQLite connection (better-sqlite3)
+│       │   ├── schema.ts       # Table definitions + migrations (ALTER TABLE)
+│       │   └── seed.ts         # Seeds example data if DB is empty
+│       ├── middleware/
+│       │   └── upload.ts       # Multer config (50 MB limit, UUID filenames)
+│       ├── routes/
+│       │   ├── trips.ts        # CRUD for trips, cover image upload
+│       │   ├── locations.ts    # CRUD for locations within a trip
+│       │   └── photos.ts       # Photo upload and delete
+│       └── types/
+│           └── index.ts        # Shared TypeScript types (Trip, Location, Photo)
+│
+└── frontend/
+    ├── Dockerfile              # Multi-stage: node build → nginx serve
+    ├── nginx.conf              # nginx config with API proxy rules
+    ├── vite.config.ts          # Vite config: PWA plugin, manualChunks, dev proxy
+    ├── index.html              # HTML shell with PWA meta tags
+    ├── package.json
+    ├── tailwind.config.js
+    ├── public/
+    │   ├── favicon.svg
+    │   └── icons/
+    │       └── icon.svg        # PWA app icon
+    └── src/
+        ├── main.tsx            # React entry, i18n init, QueryClient, Router
+        ├── App.tsx             # Route definitions
+        ├── index.css           # Global styles, Tailwind directives, custom classes
+        ├── api/
+        │   └── client.ts       # axios instance + all API calls + getImageUrl()
+        ├── components/         # Reusable UI components
+        │   ├── Navbar.tsx
+        │   ├── AddTripModal.tsx        # Create/edit trip (2-step wizard)
+        │   ├── CoverPositionPicker.tsx # Drag-to-reposition cover image
+        │   ├── InteractiveMap.tsx      # Leaflet map with route toggle
+        │   ├── LocationPanel.tsx       # Side panel: edit location, photos
+        │   ├── PhotoGallery.tsx        # Grid gallery with lightbox
+        │   ├── PhotoUploadModal.tsx    # Multi-file upload modal
+        │   ├── Timeline.tsx            # Day-by-day trip timeline
+        │   ├── TripCalendar.tsx        # Calendar highlight view
+        │   ├── TripCard.tsx            # Dashboard trip card
+        │   ├── TripPdfDocument.tsx     # @react-pdf/renderer PDF layout
+        │   ├── FilterBar.tsx
+        │   ├── StatsSection.tsx
+        │   ├── EmptyState.tsx
+        │   ├── DarkModeToggle.tsx
+        │   ├── LoadingSpinner.tsx
+        │   └── Lightbox.tsx
+        ├── hooks/
+        │   └── useTripPdfExport.tsx    # Fetches images as base64, renders PDF, downloads
+        ├── pages/
+        │   ├── Dashboard.tsx   # Home page: trip list, stats, search, filter
+        │   └── TripDetail.tsx  # Single trip: map, timeline, photos tabs
+        ├── store/
+        │   └── useStore.ts     # Zustand store: darkMode + language (localStorage)
+        ├── types/
+        │   └── index.ts        # Shared TS interfaces: Trip, Location, Photo, etc.
+        └── i18n/
+            ├── index.ts        # i18next initialisation
+            ├── useDateLocale.ts # Returns date-fns locale matching active language
+            └── locales/
+                ├── en.json     # English translations
+                └── es.json     # Spanish translations (default language)
+```
+
+---
+
+## 4. Running Locally (Dev Mode)
+
+Best for active development — hot reload on both frontend and backend.
+
+### Prerequisites
+- Node.js 20+
+- npm
+
+### Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+# API available at http://localhost:3001
+# Health check: http://localhost:3001/health
+```
+
+### Frontend (separate terminal)
+
+```bash
+cd frontend
+npm install
+npm run dev
+# App available at http://localhost:5173
+```
+
+Vite proxies `/api/` and `/uploads/` to `localhost:3001` automatically (configured in `vite.config.ts`).
+
+> **Note:** The PWA service worker does **not** register in dev mode. That is normal — it only activates in a production build.
+
+---
+
+## 5. Running Locally with Docker
+
+Builds both images from source and starts the full stack. Good for testing production behaviour before pushing to Docker Hub.
+
+```bash
+cd travel-tracker
+docker compose -f docker-compose.yml up --build
+# App available at http://localhost:5173
+```
+
+Data is persisted in `./docker-data/`:
+```
+docker-data/
+├── db/       ← SQLite file (travel.db)
+└── uploads/  ← Uploaded photos
+```
+
+Force a clean rebuild (e.g. after changing `package.json`):
+```bash
+docker compose -f docker-compose.yml build --no-cache
+docker compose -f docker-compose.yml up
+```
+
+Stop and remove containers:
+```bash
+docker compose -f docker-compose.yml down
+```
+
+---
+
+## 6. Deploying to a Server (Docker Hub)
+
+### Step 1 — Build and push from your dev machine
+
+```bash
+cd travel-tracker
+
+docker build -t srcrowder/travel-tracker-backend:latest ./backend
+docker push srcrowder/travel-tracker-backend:latest
+
+docker build -t srcrowder/travel-tracker-frontend:latest ./frontend
+docker push srcrowder/travel-tracker-frontend:latest
+```
+
+### Step 2 — Deploy on the server
+
+Copy `docker-compose.hub.yml` to the server (or edit it there), then:
+
+```bash
+docker compose -f docker-compose.hub.yml pull
+docker compose -f docker-compose.hub.yml up -d
+```
+
+### Step 3 — First-time server setup (volumes)
+
+The containers need these host directories to exist before starting:
+
+```bash
+mkdir -p /mnt/nvme/apps/travel-tracker/{ddbb,uploads}
+chmod -R 777 /mnt/nvme/apps/travel-tracker
+```
+
+### Updating the app
+
+```bash
+# On dev machine
+docker build -t srcrowder/travel-tracker-backend:latest ./backend
+docker build -t srcrowder/travel-tracker-frontend:latest ./frontend
+docker push srcrowder/travel-tracker-backend:latest
+docker push srcrowder/travel-tracker-frontend:latest
+
+# On server
+docker compose -f docker-compose.hub.yml pull
+docker compose -f docker-compose.hub.yml up -d
+```
+
+### How the containers communicate
+
+```
+Browser
+  │
+  └─► Reverse proxy (NPM / OpenResty) → port 5173 on host
+                                              │
+                                        travel-tracker-ui  (nginx)
+                                              │
+                                    /api/*  ──┤──► travel-tracker-api :3001
+                                    /uploads/ ┘
+```
+
+The frontend container's nginx proxies all `/api/` and `/uploads/` requests to the backend container on the internal Docker network. The browser only ever talks to one host — no hardcoded IP needed.
+
+---
+
+## 7. Environment Variables
+
+### Backend (`backend/.env` or compose environment)
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3001` | Port the Express server listens on |
+| `NODE_ENV` | `development` | `production` disables verbose errors |
+| `CLIENT_URL` | `http://localhost:5173` | Allowed CORS origin. Use `*` in Docker Hub compose to allow any origin |
+
+### Frontend (Vite build-time only)
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_URL` | `` (empty) | Base URL for API calls. **Keep empty** — nginx proxies internally. Only set this if you are NOT using nginx as a proxy (e.g. pointing directly to a remote API server) |
+
+> **Important:** `VITE_API_URL` is baked into the JavaScript bundle at build time, not at runtime. Changing it requires a rebuild. The Dockerfile default is now empty, so `docker build` always produces a relative-URL image that works on any host via nginx proxy.
+
+---
+
+## 8. Database Schema
+
+SQLite file lives at:
+- **Dev:** `backend/data/travel.db` (created automatically)
+- **Docker local:** `./docker-data/db/travel.db`
+- **Docker Hub / server:** `/mnt/nvme/apps/travel-tracker/ddbb/travel.db`
+
+### Tables
+
+#### `trips`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | Auto-increment |
+| `title` | TEXT | Required |
+| `description` | TEXT | Optional |
+| `start_date` | TEXT | ISO date string `YYYY-MM-DD` |
+| `end_date` | TEXT | ISO date string |
+| `cover_image` | TEXT | Filename in uploads directory |
+| `cover_position_x` | REAL | 0–100, horizontal focal point (default 50) |
+| `cover_position_y` | REAL | 0–100, vertical focal point (default 50) |
+| `tags` | TEXT | JSON array e.g. `["beach","food"]` |
+| `created_at` | TEXT | Auto-set by SQLite |
+
+#### `locations`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `trip_id` | INTEGER FK | Cascade deletes with trip |
+| `name` | TEXT | Required |
+| `country` | TEXT | Optional |
+| `lat` | REAL | Required |
+| `lng` | REAL | Required |
+| `date_start` | TEXT | Optional |
+| `date_end` | TEXT | Optional |
+| `description` | TEXT | Public-facing text |
+| `notes` | TEXT | Private notes |
+| `order_index` | INTEGER | Position in route |
+| `rating` | INTEGER | 1–5 or NULL |
+
+#### `photos`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `trip_id` | INTEGER FK | Cascade deletes with trip |
+| `location_id` | INTEGER FK | NULL = general trip photo |
+| `filename` | TEXT | UUID filename stored in uploads dir |
+| `original_name` | TEXT | Original file name from upload |
+| `caption` | TEXT | Optional |
+| `created_at` | TEXT | |
+
+### Adding a new column (migrations)
+
+The schema uses a safe migration pattern — just add to the bottom of `initializeSchema()` in `backend/src/database/schema.ts`:
+
+```typescript
+// Safe — silently ignored if column already exists
+try { db.exec(`ALTER TABLE trips ADD COLUMN my_new_column TEXT DEFAULT ''`); } catch {}
+```
+
+This runs on every startup and is idempotent.
+
+---
+
+## 9. REST API Reference
+
+Base URL: `http://localhost:3001` (dev) or via nginx proxy `/api/` (production)
+
+### Trips
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/api/trips` | — | All trips with location summaries |
+| GET | `/api/trips/:id` | — | Single trip with full locations + photos |
+| POST | `/api/trips` | multipart/form-data | Create trip |
+| PUT | `/api/trips/:id` | multipart/form-data | Update trip |
+| DELETE | `/api/trips/:id` | — | Delete trip + all photos from disk |
+
+**Form fields for POST/PUT:**
+- `title`, `description`, `start_date`, `end_date` (strings)
+- `tags` (JSON string e.g. `'["beach","food"]'`)
+- `cover_image` (file, optional)
+- `cover_position_x`, `cover_position_y` (numbers 0–100, optional)
+- `remove_cover` (`'true'` string, PUT only — removes existing cover)
+
+### Locations
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/api/trips/:tripId/locations` | — | All locations for a trip |
+| POST | `/api/trips/:tripId/locations` | JSON | Create location |
+| PUT | `/api/trips/:tripId/locations/:id` | JSON | Update location |
+| DELETE | `/api/trips/:tripId/locations/:id` | — | Delete location |
+| POST | `/api/trips/:tripId/locations/reorder` | `{ order: [{id, order_index}] }` | Reorder locations |
+
+### Photos
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/api/trips/:tripId/photos` | — | All photos for a trip |
+| POST | `/api/trips/:tripId/photos` | multipart/form-data | Upload one or more photos |
+| PATCH | `/api/trips/:tripId/photos/:id` | `{ caption }` | Update caption |
+| DELETE | `/api/trips/:tripId/photos/:id` | — | Delete photo (removes file from disk) |
+
+**Upload form fields:**
+- `photos` (one or more files)
+- `location_id` (number, optional — omit for general trip photo)
+- `caption` (string, optional — applied to all uploaded files)
+
+### Health
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Returns `{ status: "ok", timestamp: "..." }` |
+
+---
+
+## 10. Adding a New Language
+
+1. Add a new locale file at `frontend/src/i18n/locales/xx.json` (copy `en.json` as a template and translate all values).
+
+2. Register it in `frontend/src/i18n/index.ts`:
+```typescript
+import xx from './locales/xx.json';
+// add to the resources object:
+resources: { es: { translation: es }, en: { translation: en }, xx: { translation: xx } }
+```
+
+3. Add the date-fns locale in `frontend/src/i18n/useDateLocale.ts`:
+```typescript
+import { xx } from 'date-fns/locale';
+// add to the map:
+const localeMap: Record<string, Locale> = { es, en, xx };
+```
+
+4. Add a selector option in the language selector component in `Navbar.tsx`.
+
+The default language is set in `frontend/src/i18n/index.ts` (`lng: 'es'`). Change it there to make a different language the default.
+
+---
+
+## 11. Adding Features — Key Patterns
+
+### Adding a new field to Trip
+
+1. **DB migration** — `backend/src/database/schema.ts`:
+   ```typescript
+   try { db.exec(`ALTER TABLE trips ADD COLUMN my_field TEXT DEFAULT ''`); } catch {}
+   ```
+
+2. **Backend routes** — `backend/src/routes/trips.ts`: read from `req.body` in POST and PUT, add to the SQL INSERT/UPDATE.
+
+3. **Frontend type** — `frontend/src/types/index.ts`: add to the `Trip` interface.
+
+4. **UI** — `frontend/src/components/AddTripModal.tsx` for editing, `frontend/src/pages/TripDetail.tsx` or `frontend/src/components/TripCard.tsx` for display.
+
+5. **Translations** — add keys to both `en.json` and `es.json`.
+
+### Adding a new API route
+
+1. Create `backend/src/routes/myroute.ts` (copy an existing one as template).
+2. Register it in `backend/src/index.ts`: `app.use('/api/myroute', myRouter)`.
+3. Add the corresponding API calls in `frontend/src/api/client.ts`.
+
+### Adding a new component
+
+Standard pattern:
+```typescript
+import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
+
+export default function MyComponent() {
+  const { t } = useTranslation();
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <p>{t('mySection.myKey')}</p>
+    </motion.div>
+  );
+}
+```
+
+### Fetching data (TanStack Query pattern)
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const { data, isLoading } = useQuery({
+  queryKey: ['trips'],
+  queryFn: () => tripsApi.getAll().then(r => r.data),
+});
+
+const qc = useQueryClient();
+const mutation = useMutation({
+  mutationFn: (id: number) => tripsApi.delete(id),
+  onSuccess: () => qc.invalidateQueries({ queryKey: ['trips'] }),
+});
+```
+
+### Cover image display (always use object-position)
+
+When displaying a trip's cover image, always respect the stored focal point:
+```tsx
+<img
+  src={getImageUrl(trip.cover_image)}
+  className="w-full h-full object-cover"
+  style={{ objectPosition: `${trip.cover_position_x ?? 50}% ${trip.cover_position_y ?? 50}%` }}
+/>
+```
+
+### Lazy-loading a heavy library
+
+Follow the PDF export pattern in `useTripPdfExport.tsx`:
+```typescript
+const { myFunction } = await import('heavy-library');
+```
+Then add it to `manualChunks` in `vite.config.ts` so it gets its own chunk and doesn't bloat the main bundle.
+
+---
+
+## 12. Data Backup & Reset
+
+### Backup
+
+Everything important is in two places:
+
+```
+# Database
+/mnt/nvme/apps/travel-tracker/ddbb/travel.db
+
+# Uploaded photos
+/mnt/nvme/apps/travel-tracker/uploads/
+```
+
+To back up, just copy those two locations. The SQLite file is a single portable file.
+
+### Reset everything (wipe all data)
+
+```bash
+docker compose -f docker-compose.hub.yml down
+rm -rf /mnt/nvme/apps/travel-tracker/ddbb/*
+rm -rf /mnt/nvme/apps/travel-tracker/uploads/*
+docker compose -f docker-compose.hub.yml up -d
+# The app will seed example data on first startup
+```
+
+### Reset for local Docker dev
+
+```bash
+docker compose -f docker-compose.yml down
+rm -rf docker-data/
+docker compose -f docker-compose.yml up -d
+```
+
+---
+
+## 13. Common Problems & Fixes
+
+### App shows 504 Gateway Timeout
+
+The reverse proxy (NPM/OpenResty) can't reach port 5173. Check container status:
+```bash
+docker compose -f docker-compose.hub.yml ps
+docker compose -f docker-compose.hub.yml logs --tail=50
+```
+Most likely causes:
+- Frontend waiting for backend healthcheck (wait ~30 seconds after first start)
+- Volume directories don't exist → create them (see §6)
+- Port conflict → `docker compose down` then `up -d`
+
+### App calls localhost:3001 instead of server
+
+The frontend image was built without an empty `VITE_API_URL`. Rebuild with the current Dockerfile (the default is now empty):
+```bash
+docker build -t srcrowder/travel-tracker-frontend:latest ./frontend
+docker push srcrowder/travel-tracker-frontend:latest
+```
+
+### Uploaded images return 404
+
+nginx regex location was matching before the proxy rule. The nginx config uses `^~` prefix to prevent this:
+```nginx
+location ^~ /uploads/ { proxy_pass http://backend:3001/uploads/; }
+```
+If you edit `nginx.conf`, always keep `^~` on the `/api/` and `/uploads/` blocks.
+
+### "Failed to save trip" error
+
+Likely a CORS issue. Ensure `CLIENT_URL: "*"` is set in `docker-compose.hub.yml` under the backend environment, or set it to your exact domain.
+
+### PDF export is slow
+
+Normal — it fetches all trip photos as base64 before generating. A trip with many large photos can take 10–30 seconds. The button shows a spinner during the process.
+
+### PWA install prompt not appearing
+
+- Must be served over HTTPS
+- Must be a production build (not dev server)
+- Chrome requires the site to have been visited before and pass installability criteria
+- On iOS Safari: use Share → "Add to Home Screen" manually (iOS doesn't show automatic prompts)
+
+### Service worker is stale / app not updating
+
+The `sw.js` file has `Cache-Control: no-cache` in nginx, so browsers always fetch a fresh service worker. If the app still seems stale, in Chrome DevTools → Application → Service Workers → click "Update" and reload.
+
+### Backend won't start / DB errors
+
+Check backend logs:
+```bash
+docker logs travel-tracker-api --tail=50
+```
+If the DB file is corrupted, stop containers, delete `travel.db`, and restart — the app will recreate it with seed data.

@@ -1,0 +1,52 @@
+# ─── Travel Tracker — pre-built images from Docker Hub ───────────────────────
+#
+# Usage:
+#   docker compose -f docker-compose.hub.yml up -d
+#
+# The frontend uses relative URLs — nginx proxies /api/ and /uploads/ to the
+# backend internally, so this works on any IP or domain without rebuilding.
+#
+# Data persists in /mnt/nvme/apps/travel-tracker/ on the host.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── API (Node + Express + SQLite) ─────────────────────────────────────────
+  backend:
+    image: srcrowder/travel-tracker-backend:latest
+    container_name: travel-tracker-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - /mnt/nvme/apps/travel-tracker/ddbb:/app/data
+      - /mnt/nvme/apps/travel-tracker/uploads:/app/uploads
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      CLIENT_URL: "*"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # ── Frontend (React + nginx) ───────────────────────────────────────────────
+  frontend:
+    image: srcrowder/travel-tracker-frontend:latest
+    container_name: travel-tracker-ui
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1g
