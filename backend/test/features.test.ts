@@ -238,6 +238,8 @@ describe('backup', () => {
     const before = (await api.get('/api/trips')).body.length;
     const res = await api.post('/api/backup/restore').attach('backup', Buffer.concat(chunks), 'evil.zip');
     expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/file names/);
+    // Rolled back: nothing replaced
     expect((await api.get('/api/trips')).body.length).toBe(before);
   });
 

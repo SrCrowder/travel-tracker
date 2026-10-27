@@ -79,6 +79,9 @@ function extract(zipPath: string, dest: string): Promise<void> {
 
 let restoring = false;
 
+/** A backup we refuse (answered with 400 after the transaction rolled back). */
+class BadBackup extends Error {}
+
 router.post('/restore', restoreUpload.single('backup'), async (req: Request, res: Response, next: NextFunction) => {
   const zipPath = req.file?.path;
   const workDir = path.join(DATA_DIR, `restore-${crypto.randomUUID()}`);
@@ -110,15 +113,13 @@ router.post('/restore', restoreUpload.single('backup'), async (req: Request, res
       if (!backupDb.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trips'").get()) {
         throw new Error('no trips table');
       }
+      // Only real tables (a view could return different rows on each read)
+      const realTables = backupDb.prepare(
+        `SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN (${TABLES.map(() => '?').join(',')})`
+      ).get(...TABLES) as { n: number };
       migrate(backupDb);
-      // File names end up in paths on disk: only plain names are acceptable
-      const names = backupDb.prepare(`
-        SELECT filename AS name FROM photos UNION ALL SELECT original_filename FROM photos
-        UNION ALL SELECT thumb_filename FROM photos UNION ALL SELECT cover_image FROM trips
-      `).all() as { name: string | null }[];
-      const unsafe = names.some(({ name }) => name !== null && !SAFE_NAME.test(name));
       backupDb.close();
-      if (unsafe) return res.status(400).json({ error: 'The backup contains invalid file names' });
+      if (realTables.n < 3) throw new Error('missing tables');
     } catch {
       return res.status(400).json({ error: 'The backup database is not valid' });
     }
@@ -139,8 +140,19 @@ router.post('/restore', restoreUpload.single('backup'), async (req: Request, res
           db.prepare(`INSERT INTO main.${table} (${list}) SELECT ${list} FROM bk.${table}`).run();
         }
         const problems = db.pragma('foreign_key_check') as unknown[];
-        if (problems.length) throw new Error('The backup has broken references');
+        if (problems.length) throw new BadBackup('The backup has broken references');
+        // File names end up in paths on disk: check what was actually inserted
+        const names = db.prepare(`
+          SELECT filename AS name FROM main.photos UNION ALL SELECT original_filename FROM main.photos
+          UNION ALL SELECT thumb_filename FROM main.photos UNION ALL SELECT cover_image FROM main.trips
+        `).all() as { name: string | null }[];
+        if (names.some(({ name }) => name !== null && !SAFE_NAME.test(name))) {
+          throw new BadBackup('The backup contains invalid file names');
+        }
       })();
+    } catch (err) {
+      if (err instanceof BadBackup) return res.status(400).json({ error: err.message });
+      throw err;
     } finally {
       db.pragma('foreign_keys = ON');
       db.prepare('DETACH DATABASE bk').run();

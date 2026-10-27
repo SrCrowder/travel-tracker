@@ -11,6 +11,12 @@ export const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || path.join(__d
 // bundled nginx (or the Vite dev proxy) everything is same-origin.
 export const CLIENT_URL = process.env.CLIENT_URL && process.env.CLIENT_URL !== '*' ? process.env.CLIENT_URL : '';
 
+// Optional: the host names the app is reached by (e.g. "travel.example.com,192.168.1.10:5173").
+// When set, any other Host header is refused, which blocks DNS-rebinding attacks.
+// Recommended when the login (WEB_PASSWORD) is off.
+export const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS ?? '')
+  .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+
 // Demo trips are added once, when the database is created. SEED_DEMO=false skips them.
 export const SEED_DEMO = process.env.SEED_DEMO !== 'false';
 

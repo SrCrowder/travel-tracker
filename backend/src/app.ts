@@ -10,13 +10,24 @@ import publicRouter from './routes/public';
 import backupRouter from './routes/backup';
 import { authRouter, requireAuth } from './middleware/auth';
 import { removeUploadedFiles, uploadHeaders } from './middleware/upload';
-import { CLIENT_URL, UPLOADS_DIR } from './config';
+import { ALLOWED_HOSTS, CLIENT_URL, UPLOADS_DIR } from './config';
 
 const app = express();
 // Behind nginx / a reverse proxy: only trust X-Forwarded-* from private
 // networks, so a client reaching the API directly can't fake its IP
 app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 app.disable('x-powered-by');
+
+// ─── Host allowlist (DNS rebinding) ───────────────────────────────────────────
+// A malicious site can point its own domain at this server's IP; the browser
+// then treats it as same-origin. Only an allowlist of Host names stops that.
+if (ALLOWED_HOSTS.length > 0) {
+  app.use((req, res, next) => {
+    const host = (req.headers.host ?? '').toLowerCase();
+    if (req.path === '/health' || ALLOWED_HOSTS.includes(host)) return next();
+    res.status(421).json({ error: 'Unknown host' });
+  });
+}
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 // CORS is only needed when the frontend lives on another origin (CLIENT_URL)
