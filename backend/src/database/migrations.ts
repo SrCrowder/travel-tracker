@@ -140,6 +140,17 @@ const migrations: Array<(db: Database) => void> = [
       CREATE INDEX idx_tracks_trip_id ON tracks(trip_id);
     `);
   },
+
+  // 4 — background processing with retries (attempts, last error), and where
+  //     a photo's position came from: its own GPS, set by hand, or estimated.
+  (db) => {
+    db.exec(`
+      ALTER TABLE photos ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE photos ADD COLUMN error TEXT;
+      ALTER TABLE photos ADD COLUMN geo_source TEXT CHECK (geo_source IS NULL OR geo_source IN ('exif', 'manual', 'estimated'));
+      UPDATE photos SET geo_source = 'exif' WHERE lat IS NOT NULL;
+    `);
+  },
 ];
 
 export const SCHEMA_VERSION = migrations.length;

@@ -9,7 +9,7 @@ import Database from 'better-sqlite3';
 import db from '../database/db';
 import { migrate } from '../database/migrations';
 import { DATA_DIR, UPLOADS_DIR } from '../config';
-import { resumePendingVideos } from '../services/videoQueue';
+import { resumePendingMedia } from '../services/mediaJobs';
 
 // ─── Backup = one ZIP: travel.db (consistent snapshot) + uploads/ ────────────
 const router = Router();
@@ -170,7 +170,7 @@ router.post('/restore', restoreUpload.single('backup'), async (req: Request, res
       }
     }
 
-    resumePendingVideos();
+    resumePendingMedia();
     const counts = Object.fromEntries(TABLES.map((t) => [t,
       (db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n]));
     res.json({ message: 'Backup restored', files: files.length, ...counts, previous_database: path.basename(safety) });

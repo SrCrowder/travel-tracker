@@ -54,6 +54,9 @@ export interface PhotoRow {
   width: number | null;
   height: number | null;
   duration: number | null;          // seconds (videos)
+  attempts: number;                 // background processing tries so far
+  error: string | null;             // last processing error
+  geo_source: 'exif' | 'manual' | 'estimated' | null;
   created_at: string;
 }
 

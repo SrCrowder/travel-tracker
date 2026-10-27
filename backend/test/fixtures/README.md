@@ -16,3 +16,7 @@
     -movflags use_metadata_tags iphone-hevc.mov
   ```
 - `h264.mp4` — 2 s H.264 + AAC MP4 (already playable in browsers; only remuxed).
+- `iphone-hdr.mov` — 1.5 s HEVC 10-bit HLG (`arib-std-b67`, BT.2020) + AAC, like iPhone HDR videos:
+  `ffmpeg -f lavfi -i testsrc=size=640x360:rate=25 -f lavfi -i sine=frequency=330 -t 1.5 -c:v libx265 -tag:v hvc1
+  -pix_fmt yuv420p10le -x265-params colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc
+  -color_primaries bt2020 -color_trc arib-std-b67 -colorspace bt2020nc -c:a aac iphone-hdr.mov`

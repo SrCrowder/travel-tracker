@@ -4,7 +4,7 @@ import type { TripRow, LocationRow, PhotoRow, Trip, LocationWithPhotos, TripWith
 // ─── Shared SQL fragments ─────────────────────────────────────────────────────
 const PHOTO_COLUMNS = ['id', 'location_id', 'trip_id', 'media_type', 'status', 'filename', 'original_filename',
   'thumb_filename', 'original_name', 'caption', 'taken_at', 'taken_offset', 'lat', 'lng', 'camera', 'width', 'height',
-  'duration', 'created_at'];
+  'duration', 'attempts', 'error', 'geo_source', 'created_at'];
 
 // Chronological: when it was taken, falling back to when it was uploaded
 export const MEDIA_ORDER = 'COALESCE(taken_at, created_at), id';

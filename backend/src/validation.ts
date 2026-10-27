@@ -153,6 +153,20 @@ export const photoUpdateSchema = z.object({
   caption: z.string().max(2000).default(''),
 });
 
+/** Place several photos/videos at once (or clear their position: lat/lng null). */
+export const photoLocateSchema = z.object({
+  ids: z.array(id).min(1).max(5000),
+  lat: z.preprocess(emptyToNull, z.coerce.number().min(-90).max(90).nullable()),
+  lng: z.preprocess(emptyToNull, z.coerce.number().min(-180).max(180).nullable()),
+  // Also move them into a place of the trip (null = general photos); omit to keep
+  location_id: z.preprocess(emptyToNull, id.nullable()).optional(),
+  geo_source: z.enum(['manual', 'estimated']).default('manual'),
+}).refine((d) => (d.lat === null) === (d.lng === null), { message: 'give both lat and lng, or neither', path: ['lng'] });
+
+export const photoRetrySchema = z.object({
+  ids: z.array(id).max(5000).optional(), // omit: every failed item of the trip
+});
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 /** Parses `data`; on failure answers 400 with the problems and returns undefined. */
 export function validate<T extends z.ZodType>(schema: T, data: unknown, res: Response): z.output<T> | undefined {

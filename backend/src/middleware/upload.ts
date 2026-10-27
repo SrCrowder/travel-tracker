@@ -26,6 +26,14 @@ const upload = multer({
 
 export type VerifiedFile = Express.Multer.File & { media: DetectedMedia };
 
+/** Why a file of an upload was not accepted (codes the frontend translates). */
+export type RejectReason = 'unsupported_format' | 'too_large' | 'video_unsupported_server';
+export interface RejectedFile { name: string; reason: RejectReason }
+
+declare module 'express-serve-static-core' {
+  interface Request { rejectedFiles?: RejectedFile[] }
+}
+
 export function uploadedFiles(req: Request): Express.Multer.File[] {
   if (req.file) return [req.file];
   if (Array.isArray(req.files)) return req.files;
@@ -44,29 +52,50 @@ const KIND_ERROR: Record<string, string> = {
   'image,video': 'Only photos (jpg, png, webp, gif, avif, heic, tiff) and videos (mov, mp4, webm) are allowed',
 };
 
-/**
- * Runs after multer: checks each file's bytes, rejects the whole request if
- * any isn't an allowed photo/video, and renames the files to "<uuid>.<ext>".
- */
-export function verifyMedia(allowed: MediaKind[]) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    const reject = (error: string) => {
-      removeUploadedFiles(req);
-      res.status(400).json({ error });
-    };
+const REASON_TEXT: Record<RejectReason, string> = {
+  unsupported_format: 'not a supported photo or video',
+  too_large: `photos can be at most ${MAX_IMAGE_MB} MB`,
+  video_unsupported_server: 'video support is not available on this server (ffmpeg is missing)',
+};
 
+/**
+ * Runs after multer: checks each file's bytes and renames accepted files to
+ * "<uuid>.<ext>". By default one bad file rejects the whole request (covers);
+ * with `partial`, bad files are dropped one by one and listed in
+ * req.rejectedFiles, so a big import never loses good files because of one.
+ */
+export function verifyMedia(allowed: MediaKind[], { partial = false } = {}) {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const files = uploadedFiles(req);
+      const hasVideoSupport = await videoSupport();
       const detected = files.map((file) => detectMedia(readHeader(file.path)));
-      if (detected.some((m) => !m || !allowed.includes(m.kind))) return reject(KIND_ERROR[allowed.join(',')]);
-      if (files.some((file, i) => detected[i]!.kind === 'image' && file.size > MAX_IMAGE_MB * 1024 * 1024)) {
-        return reject(`Photos can be at most ${MAX_IMAGE_MB} MB`);
-      }
-      if (detected.some((m) => m!.kind === 'video') && !(await videoSupport())) {
-        return reject('Video support is not available on this server (ffmpeg is missing)');
+      const problems = files.map((file, i): RejectReason | null => {
+        const media = detected[i];
+        if (!media || !allowed.includes(media.kind)) return 'unsupported_format';
+        if (media.kind === 'image' && file.size > MAX_IMAGE_MB * 1024 * 1024) return 'too_large';
+        if (media.kind === 'video' && !hasVideoSupport) return 'video_unsupported_server';
+        return null;
+      });
+
+      const firstProblem = problems.find(Boolean);
+      if (firstProblem && !partial) {
+        removeUploadedFiles(req);
+        return res.status(400).json({
+          error: firstProblem === 'unsupported_format' ? KIND_ERROR[allowed.join(',')] : REASON_TEXT[firstProblem],
+        });
       }
 
+      req.rejectedFiles = [];
       files.forEach((file, i) => {
+        if (!problems[i]) return;
+        fs.rmSync(file.path, { force: true });
+        req.rejectedFiles!.push({ name: file.originalname, reason: problems[i]! });
+      });
+      if (Array.isArray(req.files)) req.files = req.files.filter((_, i) => !problems[i]);
+
+      files.forEach((file, i) => {
+        if (problems[i]) return;
         const name = `${path.parse(file.filename).name}.${detected[i]!.format}`;
         const target = path.join(UPLOADS_DIR, name);
         fs.renameSync(file.path, target);

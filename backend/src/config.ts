@@ -24,6 +24,12 @@ export const SEED_DEMO = process.env.SEED_DEMO !== 'false';
 export const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
 export const FFPROBE_PATH = process.env.FFPROBE_PATH || 'ffprobe';
 
+// Background media processing (HEIC → JPEG, thumbnails, video conversion).
+// One job at a time with 2 ffmpeg threads keeps a small server responsive;
+// raise them on a bigger machine.
+export const MEDIA_WORKERS = Math.max(1, Number(process.env.MEDIA_WORKERS) || 1);
+export const FFMPEG_THREADS = Math.max(1, Number(process.env.FFMPEG_THREADS) || 2);
+
 // Per-file upload limits
 export const MAX_IMAGE_MB = Number(process.env.MAX_IMAGE_MB) || 50;
 export const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB) || 4096;

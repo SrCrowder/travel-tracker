@@ -7,7 +7,7 @@ import { UPLOADS_DIR } from '../config';
 import { EMPTY_METADATA, validCoords, type ImageFormat, type MediaMetadata } from './media';
 
 // Formats every browser can show directly; the rest get a JPEG copy for display
-const BROWSER_FORMATS: ImageFormat[] = ['jpg', 'png', 'gif', 'webp', 'avif'];
+export const BROWSER_FORMATS: ImageFormat[] = ['jpg', 'png', 'gif', 'webp', 'avif'];
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 // "2019:10:20 18:34:30" → "2019-10-20T18:34:30"

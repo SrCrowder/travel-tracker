@@ -151,8 +151,12 @@ describe('share links', () => {
       new_locations: JSON.stringify([{ name: 'Rome', lat: 41.9, lng: 12.5, notes: 'door code 1234' }]),
     });
     const other = await createTrip();
-    const photo = (await api.post(`/api/trips/${trip.id}/photos`).attach('photos', PNG, 'a.png')).body[0];
-    const otherPhoto = (await api.post(`/api/trips/${other.id}/photos`).attach('photos', PNG, 'b.png')).body[0];
+    const uploaded = (await api.post(`/api/trips/${trip.id}/photos`).attach('photos', PNG, 'a.png')).body.photos[0];
+    const otherPhoto = (await api.post(`/api/trips/${other.id}/photos`).attach('photos', PNG, 'b.png')).body.photos[0];
+    // Thumbnails are made in the background
+    const { mediaQueueIdle } = await import('../src/services/mediaJobs');
+    await mediaQueueIdle();
+    const photo = (await api.get(`/api/trips/${trip.id}/photos`)).body[0];
 
     const { share_token: token } = (await api.post(`/api/trips/${trip.id}/share`)).body;
     expect(token).toMatch(/^[A-Za-z0-9_-]{24}$/);
@@ -254,7 +258,7 @@ describe('trip export', () => {
 describe('backup', () => {
   it('exports everything and restores it, keeping the previous database aside', async () => {
     const trip = await createTrip({ title: 'Keep me' });
-    const photo = (await api.post(`/api/trips/${trip.id}/photos`).attach('photos', PNG, 'p.png')).body[0];
+    const photo = (await api.post(`/api/trips/${trip.id}/photos`).attach('photos', PNG, 'p.png')).body.photos[0];
 
     const exported = await api.get('/api/backup').buffer(true).parse((res, cb) => {
       const chunks: Buffer[] = [];

@@ -138,10 +138,10 @@ describe('photos', () => {
     const res = await api.post(`/api/trips/${trip.id}/photos`)
       .attach('photos', PNG, { filename: 'evil.html', contentType: 'image/png' });
     expect(res.status).toBe(201);
-    expect(res.body[0].filename).toMatch(/^[0-9a-f-]{36}\.png$/);
-    expect(res.body[0].original_name).toBe('evil.html');
+    expect(res.body.photos[0].filename).toMatch(/^[0-9a-f-]{36}\.png$/);
+    expect(res.body.photos[0].original_name).toBe('evil.html');
 
-    const file = await api.get(`/uploads/${res.body[0].filename}`);
+    const file = await api.get(`/uploads/${res.body.photos[0].filename}`);
     expect(file.headers['content-type']).toBe('image/png');
     expect(file.headers['x-content-type-options']).toBe('nosniff');
     expect(file.headers['content-security-policy']).toContain('sandbox');
@@ -165,7 +165,7 @@ describe('photos', () => {
     const trip = await createTrip();
     const up = await api.post(`/api/trips/${trip.id}/photos`)
       .attach('photos', PNG, { filename: 'a.png', contentType: 'image/png' });
-    const filename = up.body[0].filename;
+    const filename = up.body.photos[0].filename;
     expect(listUploads(env.uploadsDir)).toContain(filename);
     expect((await api.delete(`/api/trips/${trip.id}`)).status).toBe(200);
     expect(listUploads(env.uploadsDir)).not.toContain(filename);
