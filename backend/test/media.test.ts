@@ -10,7 +10,7 @@ const { default: app } = await import('../src/app');
 const { initDatabase } = await import('../src/database');
 const { videoQueueIdle } = await import('../src/services/videoQueue');
 const { detectMedia } = await import('../src/services/media');
-const { backfillPhotos } = await import('../src/services/backfill');
+const { backfillPhotos, backfillMetadata } = await import('../src/services/backfill');
 const { default: db } = await import('../src/database/db');
 initDatabase();
 
@@ -61,6 +61,27 @@ describe('photos', () => {
     expect(fs.readFileSync(path.join(env.uploadsDir, photo.original_filename)).equals(fixture('iphone7.heic'))).toBe(true);
     expect((await api.get(`/uploads/${photo.filename}`)).headers['content-type']).toBe('image/jpeg');
     expect((await api.get(`/uploads/${photo.thumb_filename}`)).headers['content-type']).toBe('image/webp');
+  });
+
+  it('reads date and GPS from iOS 18 HEIC files (longer ftyp box)', async () => {
+    const trip = await createTrip();
+    const res = await api.post(`/api/trips/${trip.id}/photos`).attach('photos', fixture('iphone-ios18.heic'), 'IMG_1978.HEIC');
+    expect(res.status).toBe(201);
+    expect(res.body[0]).toMatchObject({ taken_at: '2019-10-20T18:34:30', camera: 'Apple iPhone 7' });
+    expect(res.body[0].lat).toBeCloseTo(38.0466, 3);
+    expect(res.body[0].lng).toBeCloseTo(12.9944, 3);
+    expect(res.body[0].filename).toMatch(/\.jpg$/); // still decodes
+  });
+
+  it('recovers date and GPS of photos uploaded while they could not be read', async () => {
+    const trip = await createTrip();
+    const photo = (await api.post(`/api/trips/${trip.id}/photos`).attach('photos', fixture('iphone-ios18.heic'), 'a.heic')).body[0];
+    // As stored by the old version: no metadata
+    db.prepare('UPDATE photos SET taken_at = NULL, taken_offset = NULL, lat = NULL, lng = NULL WHERE id = ?').run(photo.id);
+    expect(await backfillMetadata()).toBeGreaterThanOrEqual(1);
+    const fixed = await getPhoto(trip.id, photo.id);
+    expect(fixed.taken_at).toBe('2019-10-20T18:34:30');
+    expect(fixed.lat).toBeCloseTo(38.0466, 3);
   });
 
   it('accepts a HEIC cover and stores a browser-friendly JPEG', async () => {

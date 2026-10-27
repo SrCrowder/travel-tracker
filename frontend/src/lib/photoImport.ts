@@ -3,6 +3,7 @@
 // group them into places and name those places.
 
 import { readVideoMetadata } from './videoMetadata';
+import { loadExifr } from './exifr';
 
 export interface PhotoInfo {
   file: File;
@@ -57,7 +58,7 @@ function exifDate(value: unknown): string | null {
 
 /** Reads date and GPS from each file. Files without metadata are kept, just without data. */
 export async function readPhotoInfo(files: File[], onProgress?: (done: number) => void): Promise<PhotoInfo[]> {
-  const { default: exifr } = await import('exifr');
+  const exifr = await loadExifr();
   const results: PhotoInfo[] = [];
   for (const file of files) {
     if (isVideoFile(file)) {

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import exifr from 'exifr';
+import exifr from './exifr';
 import heicDecode from 'heic-decode';
 import { UPLOADS_DIR } from '../config';
 import { EMPTY_METADATA, validCoords, type ImageFormat, type MediaMetadata } from './media';

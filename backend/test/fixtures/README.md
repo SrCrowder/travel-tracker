@@ -2,6 +2,9 @@
 
 - `iphone7.heic` — real iPhone 7 HEIC photo with EXIF date (2019-10-20 18:34:30 +02:00) and GPS
   (38.0466 N, 12.9944 E). From the [exifr](https://github.com/MikeKovarik/exifr) test fixtures (MIT licence).
+- `iphone-ios18.heic` — `iphone7.heic` with the 52-byte `ftyp` box iOS 18 writes
+  (`mif1 MiHB MiHA heix MiHE MiPr miaf heic tmap`), iloc offsets shifted to match. exifr's stock
+  HEIC detection rejects it (ftyp > 50 bytes); see `src/services/exifr.ts`.
 - `iphone-hevc.mov` — 3 s HEVC (`hvc1`) + AAC QuickTime file with the same metadata keys an iPhone writes
   (`com.apple.quicktime.location.ISO6709`, `creationdate`, `make`, `model`). Generated with:
   ```
