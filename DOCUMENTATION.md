@@ -32,6 +32,7 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 | Expenses & budget | Per-trip expenses (category, date, place, any currency); totals per category, per day and against the budget |
 | GPS tracks | Upload GPX/KML files (watch, Strava, Wikiloc, Google My Maps…); drawn on the trip map with their distance |
 | Share link | Read-only public page of a trip (map, timeline, photos/videos) — no login needed; notes, expenses and budget stay private; revocable |
+| Trip export | Per trip, a ZIP with every photo/video **exactly as uploaded** (HEIC, MOV… with their metadata), named as on the device and grouped per place, plus `trip.json`, `expenses.csv`, the cover and the tracks as GeoJSON |
 | Backup | Download everything (database + all files) as a ZIP; restore a ZIP (the previous database is kept as `pre-restore-*.db`) |
 | Reorder route | Drag (or use the keyboard on) the handle in the trip's location list |
 | Cover photo reposition | Drag to set the focal point of the cover image (shown in cards and hero) |
@@ -478,6 +479,12 @@ When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/up
 - `photos` (one or more files, up to 50 per request: photos — jpg, png, gif, webp, avif, heic, tiff, max 50 MB — and videos — mov, mp4, webm, max 4 GB. The type is detected from the content and non-media files are rejected with `400`)
 - `location_id` (number, optional — omit for general trip photo)
 - `caption` (string, optional — applied to all uploaded files)
+
+### Trip export
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/trips/:id/export` | ZIP: `<title>/media/<NN place>/<original name>` (originals), `trip.json` (trip, places with notes, media metadata, expenses, tracks), `expenses.csv`, `cover.*`, `tracks/*.geojson` |
 
 ### Share links
 

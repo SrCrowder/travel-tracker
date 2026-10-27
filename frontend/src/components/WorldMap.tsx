@@ -72,8 +72,12 @@ export default function WorldMap({ trips }: { trips: Trip[] }) {
   const onEach = (f: GeoJSON.Feature, layer: Layer) => {
     const entry = byNumeric.get(String(f.id));
     if (!entry) return;
-    const titles = entry.trips.map((trip) => trip.title).join(', ');
-    layer.bindTooltip(`<strong>${countryName(entry.code, i18n.language)}</strong><br/>${titles}`, { sticky: true });
+    // Built from text nodes: trip titles are user input, never HTML
+    const el = document.createElement('div');
+    const name = document.createElement('strong');
+    name.textContent = countryName(entry.code, i18n.language);
+    el.append(name, document.createElement('br'), document.createTextNode(entry.trips.map((trip) => trip.title).join(', ')));
+    layer.bindTooltip(el, { sticky: true });
   };
 
   const percent = Math.round((visited.size / WORLD_COUNTRIES) * 100);

@@ -3,6 +3,7 @@ import db from '../database/db';
 import upload, { verifyMedia, removeUploadedFiles, deleteUpload, type VerifiedFile } from '../middleware/upload';
 import { processImage } from '../services/images';
 import { deleteMediaFiles } from '../services/storage';
+import { streamTripExport } from '../services/tripExport';
 import type { ImageFormat } from '../services/media';
 import { getTrip, getTripRow, listTrips } from '../database/queries';
 import crypto from 'crypto';
@@ -168,6 +169,15 @@ router.put('/:id', upload.single('cover_image'), verifyMedia(['image']), async (
   // Only touch the disk once the database change is committed
   if (replacingCover && existing.cover_image !== coverImage) deleteUpload(existing.cover_image);
   res.json(getTrip(existing.id));
+});
+
+// ─── Download everything about a trip, with the original files ───────────────
+router.get('/:id/export', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!(await streamTripExport(Number(req.params.id), res))) res.status(404).json({ error: 'Trip not found' });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ─── Share link (read-only public page) ──────────────────────────────────────

@@ -45,7 +45,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
+          # Converting iPhone 4K videos (ffmpeg) needs headroom
+          memory: 2g
 
   # ── Frontend (React + nginx) ───────────────────────────────────────────────
   frontend:

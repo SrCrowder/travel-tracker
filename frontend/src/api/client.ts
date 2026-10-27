@@ -51,6 +51,9 @@ export const tripsApi = {
 
   delete: (id: number) => api.delete<{ message: string }>(`/trips/${id}`),
 
+  /** ZIP with the original files, trip.json, expenses.csv and tracks (plain link: streamed to disk) */
+  exportUrl: (id: number) => `${BASE_URL}/trips/${id}/export`,
+
   share: (id: number) => api.post<{ share_token: string }>(`/trips/${id}/share`),
   unshare: (id: number) => api.delete<{ share_token: null }>(`/trips/${id}/share`),
 };

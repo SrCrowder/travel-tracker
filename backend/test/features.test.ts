@@ -187,6 +187,70 @@ function zipEntries(buffer: Buffer): Promise<string[]> {
   });
 }
 
+function zipContents(buffer: Buffer): Promise<Map<string, Buffer>> {
+  return new Promise((resolve, reject) => {
+    yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zip) => {
+      if (err || !zip) return reject(err);
+      const files = new Map<string, Buffer>();
+      zip.on('entry', (entry: yauzl.Entry) => {
+        zip.openReadStream(entry, (e, stream) => {
+          if (e || !stream) return reject(e);
+          const chunks: Buffer[] = [];
+          stream.on('data', (c: Buffer) => chunks.push(c));
+          stream.on('end', () => { files.set(entry.fileName, Buffer.concat(chunks)); zip.readEntry(); });
+        });
+      });
+      zip.on('end', () => resolve(files));
+      zip.readEntry();
+    });
+  });
+}
+
+const binary = (res: import('http').IncomingMessage, cb: (err: Error | null, body: Buffer) => void) => {
+  const chunks: Buffer[] = [];
+  res.on('data', (c: Buffer) => chunks.push(c));
+  res.on('end', () => cb(null, Buffer.concat(chunks)));
+};
+
+describe('trip export', () => {
+  it('zips the original files per place, plus trip.json, expenses.csv and tracks', async () => {
+    const heic = fs.readFileSync(path.join(__dirname, 'fixtures', 'iphone7.heic'));
+    const trip = await createTrip({
+      title: 'Sicily: 2019',
+      new_locations: JSON.stringify([{ name: 'Trapani/Erice', lat: 38.0, lng: 12.5, notes: 'mine' }]),
+    });
+    const locId = trip.locations[0].id;
+    await api.post(`/api/trips/${trip.id}/photos`).field('location_id', locId)
+      .attach('photos', heic, 'IMG_0001.HEIC').attach('photos', heic, 'IMG_0001.HEIC');
+    await api.post(`/api/trips/${trip.id}/photos`).attach('photos', PNG, 'general.png');
+    await api.post(`/api/trips/${trip.id}/expenses`).send({ amount: 12, description: '=HYPERLINK("x")', location_id: locId });
+    await api.post(`/api/trips/${trip.id}/tracks`).attach('file', Buffer.from(GPX), 'walk.gpx');
+
+    const res = await api.get(`/api/trips/${trip.id}/export`).buffer(true).parse(binary);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('Sicily 2019.zip');
+    const files = await zipContents(res.body);
+    const names = [...files.keys()];
+    expect(names).toEqual(expect.arrayContaining([
+      'Sicily 2019/trip.json', 'Sicily 2019/expenses.csv', 'Sicily 2019/tracks/Morning walk.geojson',
+      'Sicily 2019/media/00 General/general.png',
+      'Sicily 2019/media/01 Trapani Erice/IMG_0001.heic',
+      'Sicily 2019/media/01 Trapani Erice/IMG_0001 (2).heic',
+    ]));
+    // The original bytes, untouched (EXIF included)
+    expect(files.get('Sicily 2019/media/01 Trapani Erice/IMG_0001.heic')!.equals(heic)).toBe(true);
+
+    const info = JSON.parse(files.get('Sicily 2019/trip.json')!.toString());
+    expect(info.trip.locations[0]).toMatchObject({ name: 'Trapani/Erice', notes: 'mine' });
+    expect(info.media.find((m: { file: string }) => m.file.endsWith('IMG_0001.heic'))).toMatchObject({ taken_at: '2019-10-20T18:34:30', camera: 'Apple iPhone 7' });
+    expect(info.trip.share_token).toBeUndefined();
+    // Formulas are neutralised in the CSV
+    expect(files.get('Sicily 2019/expenses.csv')!.toString()).toContain(`"'=HYPERLINK(""x"")"`);
+
+    expect((await api.get('/api/trips/99999/export')).status).toBe(404);
+  });
+});
+
 describe('backup', () => {
   it('exports everything and restores it, keeping the previous database aside', async () => {
     const trip = await createTrip({ title: 'Keep me' });

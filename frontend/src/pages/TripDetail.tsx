@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Calendar, MapPin, Clock, Tag, Trash2, MoreVertical, Pencil, ImagePlus, FileDown, Loader2, Images, Link2,
-  Sparkles, CalendarClock,
+  Sparkles, CalendarClock, FolderDown,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { tripsApi, locationsApi, getImageUrl, allMedia } from '../api/client';
@@ -193,6 +193,16 @@ export default function TripDetail() {
                   <Images size={15} />
                   {t('tripDetail.importMedia')}
                 </button>
+                <a
+                  href={tripsApi.exportUrl(trip.id)}
+                  download
+                  onClick={() => setMenuOpen(false)}
+                  title={t('tripDetail.exportRawHint')}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <FolderDown size={15} />
+                  {t('tripDetail.exportRaw')}
+                </a>
                 <button
                   onClick={() => { setMenuOpen(false); exportPdf(trip); }}
                   disabled={exporting}

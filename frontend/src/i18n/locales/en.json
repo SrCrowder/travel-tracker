@@ -95,7 +95,9 @@
     "uploadPhotos": "Upload photos or videos",
     "exportPdf": "Export PDF",
     "exportingPdf": "Exporting…",
-    "importMedia": "Import photos & videos"
+    "importMedia": "Import photos & videos",
+    "exportRaw": "Download originals (ZIP)",
+    "exportRawHint": "Every photo and video exactly as uploaded (HEIC, MOV…), per place, with the trip info, expenses and tracks"
   },
   "pdf": {
     "locations": "Locations",
