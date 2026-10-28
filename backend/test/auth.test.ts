@@ -131,6 +131,8 @@ describe('auth', () => {
     for (let i = 0; i < 100; i++) await login('bad', `10.8.${i >> 8}.${i & 255}`);
     expect((await login('secret', '10.7.0.1')).status).toBe(429); // unknown IP: global cap
     expect((await login('secret', '10.9.0.1')).status).toBe(200); // known IP still gets in
+    // A user's login doesn't make its IP known: still under the global cap
+    expect((await login('secret', '10.5.0.1')).status).toBe(429);
   });
 
   it('keeps sessions from before users existed (admin)', async () => {

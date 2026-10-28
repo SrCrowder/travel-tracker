@@ -118,7 +118,7 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
 
 // ─── Brute-force protection ──────────────────────────────────────────────────
 // Per-IP limit, plus a global one so rotating or spoofed IPs can't keep
-// guessing. IPs that logged in successfully before skip the global limit, so
+// guessing. IPs where the admin logged in before skip the global limit, so
 // an attacker can't lock the owner out. Existing sessions always keep working.
 const MAX_FAILURES_PER_IP = 10;
 const MAX_FAILURES_GLOBAL = 100;
@@ -146,8 +146,11 @@ function isLockedOut(ip: string): boolean {
   return failureCount(GLOBAL_KEY) >= MAX_FAILURES_GLOBAL;
 }
 
-function recordSuccess(ip: string) {
+// Only the admin's IPs skip the global cap: a user's account must not open a
+// way around it for guessing the admin password
+function recordSuccess(ip: string, trusted: boolean) {
   failures.delete(ip);
+  if (!trusted) return;
   knownIps.delete(ip); // re-insert so the oldest entry is evicted first
   knownIps.set(ip, Date.now());
   if (knownIps.size > MAX_KNOWN_IPS) knownIps.delete(knownIps.keys().next().value!);
@@ -211,7 +214,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  recordSuccess(ip);
+  recordSuccess(ip, session.role === 'admin');
   res.cookie(COOKIE_NAME, createToken(session), {
     httpOnly: true,
     sameSite: 'lax',
