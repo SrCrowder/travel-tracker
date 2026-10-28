@@ -7,6 +7,7 @@ import TripInfoStep from './addTrip/TripInfoStep';
 import LocationsStep from './addTrip/LocationsStep';
 import { EMPTY_TRIP_FORM, type LocationDraft, type TripFormValues } from './addTrip/types';
 import type { Trip, Location } from '../types';
+import Portal from './Portal';
 
 interface AddTripModalProps {
   isOpen: boolean;
@@ -128,6 +129,7 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, initialTrip }
   if (!isOpen) return null;
 
   return (
+    <Portal>
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -224,5 +226,6 @@ export default function AddTripModal({ isOpen, onClose, onSuccess, initialTrip }
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </Portal>
   );
 }

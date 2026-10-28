@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { photosApi } from '../api/client';
 import { MEDIA_ACCEPT, MAX_VIDEO_SIZE, isVideoFile, mediaSizeValidator } from '../lib/photoImport';
 import type { Location } from '../types';
+import Portal from './Portal';
 
 const PHOTO_BATCH = 4;
 
@@ -122,6 +123,7 @@ export default function PhotoUploadModal({
   if (!isOpen) return null;
 
   return (
+    <Portal>
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -278,5 +280,6 @@ export default function PhotoUploadModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </Portal>
   );
 }

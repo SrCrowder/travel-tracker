@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { isAxiosError } from 'axios';
 import { backupApi } from '../api/client';
+import Portal from './Portal';
 
 /** Download everything as a ZIP, or replace everything with a ZIP. */
 export default function BackupModal({ onClose }: { onClose: () => void }) {
@@ -37,6 +38,7 @@ export default function BackupModal({ onClose }: { onClose: () => void }) {
   const busy = progress !== null;
 
   return (
+    <Portal>
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={() => !busy && onClose()}>
@@ -73,5 +75,6 @@ export default function BackupModal({ onClose }: { onClose: () => void }) {
         </div>
       </motion.div>
     </motion.div>
+    </Portal>
   );
 }

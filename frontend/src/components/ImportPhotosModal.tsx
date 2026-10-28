@@ -16,6 +16,7 @@ import {
 } from '../lib/photoImport';
 import { inputClass, labelClass } from './addTrip/types';
 import type { Trip, UploadFailure, UploadFailureReason } from '../types';
+import Portal from './Portal';
 
 // Refusals that a second try can't fix
 const FINAL_REASONS: UploadFailureReason[] = ['unsupported_format', 'too_large', 'video_unsupported_server'];
@@ -273,6 +274,7 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
   const close = () => { if (!busy) onClose(); };
 
   return (
+    <Portal>
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -514,6 +516,7 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </Portal>
   );
 }
 

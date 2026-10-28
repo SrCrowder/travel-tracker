@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { mediaUrl, originalUrl, thumbUrl } from '../api/client';
 import { useDateLocale } from '../i18n/useDateLocale';
 import type { Photo } from '../types';
+import Portal from './Portal';
 
 interface LightboxProps {
   photos: Photo[];
@@ -41,6 +42,7 @@ export default function Lightbox({ photos, startIndex, onClose, placeName }: Lig
   const place = placeName?.(photo);
 
   return (
+    <Portal>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -127,5 +129,6 @@ export default function Lightbox({ photos, startIndex, onClose, placeName }: Lig
         </button>
       )}
     </motion.div>
+    </Portal>
   );
 }

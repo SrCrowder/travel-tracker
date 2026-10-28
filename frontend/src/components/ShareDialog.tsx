@@ -4,6 +4,7 @@ import { X, Link2, Copy, Check, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { tripsApi } from '../api/client';
 import type { Trip } from '../types';
+import Portal from './Portal';
 
 interface ShareDialogProps {
   trip: Trip;
@@ -38,6 +39,7 @@ export default function ShareDialog({ trip, onClose, onChanged }: ShareDialogPro
   };
 
   return (
+    <Portal>
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <motion.div initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }} onClick={(e) => e.stopPropagation()}
@@ -78,5 +80,6 @@ export default function ShareDialog({ trip, onClose, onChanged }: ShareDialogPro
         )}
       </motion.div>
     </motion.div>
+    </Portal>
   );
 }

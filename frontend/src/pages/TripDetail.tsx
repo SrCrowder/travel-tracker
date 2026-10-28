@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,6 +53,25 @@ export default function TripDetail() {
   const [activeTab, setActiveTab] = useState<TabId>('map');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The menu is drawn in <body> at the button's position, so the cover's
+  // overflow-hidden (or the map below) can't cut it
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const toggleMenu = () => {
+    const rect = menuButton.current?.getBoundingClientRect();
+    if (rect) setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    setMenuOpen((o) => !o);
+  };
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, { passive: true });
+    return () => {
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close);
+    };
+  }, [menuOpen]);
   const { exportPdf, exporting } = useTripPdfExport();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -152,7 +172,7 @@ export default function TripDetail() {
       <Navbar />
 
       {/* ── Hero Banner ────────────────────────────────────────────────── */}
-      <div className="relative h-64 md:h-80 lg:h-96 overflow-hidden">
+      <div className="relative h-72 md:h-80 lg:h-96 overflow-hidden">
         {trip.cover_image ? (
           <img
             src={getImageUrl(trip.cover_image)}
@@ -172,27 +192,36 @@ export default function TripDetail() {
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           onClick={() => navigate('/')}
-          className="absolute top-5 left-5 flex items-center gap-2 text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium transition-colors"
+          // z-10: on narrow screens the title/tags block grows up over the buttons
+          className="absolute z-10 top-5 left-5 flex items-center gap-2 text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium transition-colors"
         >
           <ArrowLeft size={15} />
           {t('tripDetail.allTrips')}
         </motion.button>
 
         {/* Menu button */}
-        <div className="absolute top-5 right-5">
+        <div className="absolute z-10 top-5 right-5">
           <button
-            onClick={() => setMenuOpen((o) => !o)}
+            ref={menuButton}
+            onClick={toggleMenu}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             className="w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm flex items-center justify-center text-white transition-colors"
           >
             <MoreVertical size={16} />
           </button>
-          <AnimatePresence>
-            {menuOpen && (
+          {createPortal(<AnimatePresence>
+            {menuOpen && menuPos && (
+              <>
+              {/* Click outside closes it */}
+              <div className="fixed inset-0 z-[1290]" onClick={() => setMenuOpen(false)} />
               <motion.div
+                role="menu"
                 initial={{ opacity: 0, scale: 0.9, y: -4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: -4 }}
-                className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-10"
+                style={{ top: menuPos.top, right: menuPos.right, maxHeight: `calc(100vh - ${menuPos.top + 12}px)` }}
+                className="fixed z-[1300] w-56 origin-top-right overflow-y-auto bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700"
               >
                 <button
                   onClick={() => { setMenuOpen(false); setEditModalOpen(true); }}
@@ -241,8 +270,9 @@ export default function TripDetail() {
                   {t('tripDetail.deleteTrip')}
                 </button>
               </motion.div>
+              </>
             )}
-          </AnimatePresence>
+          </AnimatePresence>, document.body)}
         </div>
 
         {/* Trip info overlay */}

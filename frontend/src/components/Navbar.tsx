@@ -174,6 +174,8 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
           </div>
         </div>
       </div>
+      {/* BackupModal renders in <body> (the navbar's backdrop-blur would
+          otherwise make "fixed" relative to the navbar, off screen) */}
       <AnimatePresence>
         {backupOpen && <BackupModal onClose={() => setBackupOpen(false)} />}
       </AnimatePresence>
