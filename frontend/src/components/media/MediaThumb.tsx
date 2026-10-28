@@ -1,4 +1,4 @@
-import { Play, Loader2, AlertTriangle } from 'lucide-react';
+import { Play, Loader2, AlertTriangle, Image as ImageIcon, Film } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { thumbUrl } from '../../api/client';
 import type { Photo } from '../../types';
@@ -23,11 +23,21 @@ interface MediaThumbProps {
 export default function MediaThumb({ photo, className = '', compact }: MediaThumbProps) {
   const { t } = useTranslation();
   const isVideo = photo.media_type === 'video';
+  // Until the background job runs there may be nothing to show yet
+  // (HEIC → JPEG, video poster): use an icon instead of a broken image
+  const hasPreview = !!photo.thumb_filename || (photo.status === 'ready' && !isVideo);
 
   return (
-    <div className={`relative overflow-hidden bg-slate-200 dark:bg-slate-700 ${className}`}>
-      <img src={thumbUrl(photo)} alt={photo.caption || photo.original_name} loading="lazy"
-        className="w-full h-full object-cover" />
+    <div className={`relative overflow-hidden bg-slate-200 dark:bg-slate-700 ${className}`}
+      title={photo.status === 'failed' && photo.error ? `${t('media.failed')}: ${photo.error}` : undefined}>
+      {hasPreview ? (
+        <img src={thumbUrl(photo)} alt={photo.caption || photo.original_name} loading="lazy"
+          className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-slate-400">
+          {isVideo ? <Film size={compact ? 16 : 24} /> : <ImageIcon size={compact ? 16 : 24} />}
+        </div>
+      )}
 
       {isVideo && photo.status === 'ready' && (
         <>

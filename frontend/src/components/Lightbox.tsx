@@ -88,13 +88,16 @@ export default function Lightbox({ photos, startIndex, onClose, placeName }: Lig
           {isVideo && photo.status === 'ready' ? (
             <video key={photo.id} src={mediaUrl(photo)} poster={thumbUrl(photo)} controls autoPlay playsInline
               className="max-w-full max-h-[75vh] rounded-lg shadow-2xl bg-black" />
-          ) : isVideo ? (
-            <div className="relative">
-              <img src={thumbUrl(photo)} alt="" className="max-w-full max-h-[75vh] rounded-lg opacity-60" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white text-sm">
+          ) : photo.status !== 'ready' ? (
+            <div className="relative min-w-[16rem] min-h-[10rem] flex items-center justify-center">
+              {photo.thumb_filename && <img src={thumbUrl(photo)} alt="" className="max-w-full max-h-[75vh] rounded-lg opacity-60" />}
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white text-sm text-center px-4">
                 {photo.status === 'processing'
-                  ? <><Loader2 size={28} className="animate-spin" />{t('media.processingLong')}</>
-                  : <><AlertTriangle size={28} className="text-amber-300" />{t('media.failedLong')}</>}
+                  ? <><Loader2 size={28} className="animate-spin" />{t(isVideo ? 'media.processingLong' : 'media.processingPhoto')}</>
+                  : <>
+                    <AlertTriangle size={28} className="text-amber-300" />{t('media.failedLong')}
+                    {photo.error && <span className="text-xs text-white/50 max-w-md">{photo.error}</span>}
+                  </>}
               </div>
             </div>
           ) : (

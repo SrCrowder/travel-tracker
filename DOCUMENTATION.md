@@ -314,6 +314,8 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 | `CLIENT_URL` | *(empty)* | Only if the frontend is served from **another origin** (CORS). Not needed behind the bundled nginx or the Vite dev proxy |
 | `DATA_DIR` / `UPLOADS_DIR` | `backend/data`, `backend/uploads` | Where the database and the uploaded files live (`/app/data`, `/app/uploads` in Docker) |
 | `MAX_IMAGE_MB` / `MAX_VIDEO_MB` | `50` / `4096` | Largest photo / video accepted |
+| `MEDIA_WORKERS` | `1` | Background jobs run at once (thumbnails, HEIC → JPEG, video conversion) |
+| `FFMPEG_THREADS` | `2` | Threads per ffmpeg run (conversions also run at low CPU priority) |
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Needed for videos (included in the Docker image). Without them video uploads are refused |
 | `ALLOWED_HOSTS` | *(empty)* | Comma-separated host names the app is reached by (e.g. `travel.example.com,192.168.1.10:5173`). Other `Host` headers get `421`, which blocks DNS-rebinding attacks. **Recommended when the login is off** |
 | `SEED_DEMO` | `true` | Adds 3 demo trips **only when the database is created**. Set `false` to start empty |
@@ -392,10 +394,11 @@ SQLite file lives at:
 
 #### How uploads are processed
 
-1. The type is detected from the file's **bytes** (never its name or MIME type); anything else is rejected with `400`.
-2. Photos: EXIF is read (`exifr`), a thumbnail is made (`sharp`), and HEIC/TIFF get a JPEG copy for the browser (HEIC is decoded with `heic-decode`, since `sharp`'s libvips has no HEVC decoder).
-3. Videos: `ffprobe` reads date, GPS and camera (`com.apple.quicktime.*` tags), `ffmpeg` grabs a poster frame. H.264 videos are remuxed to MP4 (no quality loss); anything else (iPhone HEVC, 10-bit HDR…) is re-encoded to H.264 1080p **in the background** — the upload answers at once with `status: processing` and the trip page refreshes until it's ready. Interrupted conversions resume on restart.
-4. Photos uploaded before this existed get thumbnails and EXIF data in the background on startup.
+1. The type is detected from each file's **bytes** (never its name or MIME type). Each file is judged on its own: the answer lists what was saved and, per refused file, a reason code (`unsupported_format`, `too_large`, `video_unsupported_server`).
+2. The upload only stores the original (untouched) and reads its metadata: EXIF for photos (`exifr`, with a fix for iOS 18 HEIC files), `com.apple.quicktime.*` tags for videos (`ffprobe`). Nothing heavy happens in the request, so imports don't fail for lack of resources.
+3. A background queue (`services/mediaJobs.ts`, `MEDIA_WORKERS` at a time) then makes the thumbnails, the JPEG copy of HEIC/TIFF (decoded with `heic-decode`; `sharp`'s libvips has no HEVC decoder) and the playable MP4: H.264 is remuxed; anything else (iPhone HEVC, 10-bit HDR…) is re-encoded to H.264 ≤1080p with HDR tone-mapped to SDR, using the first decodable audio track (iPhone 16 adds an APAC spatial track) and retrying without audio if needed.
+4. A failed job is retried 3 times with a growing pause (`attempts`, `error` columns); pending work resumes after a restart; `POST /photos/retry` re-queues failed items. Items stay `processing` until their browser copy exists; a photo the browser can already show stays `ready`.
+5. Photos without GPS can be placed by hand or estimated (`geo_source`): see `PATCH /api/trips/:tripId/photos`.
 
 #### `trips` (added in migration 3)
 `status` (`done` / `planned` / `wishlist`), `share_token`, `budget`, `currency` (ISO 4217, default `EUR`). `start_date` / `end_date` are NULL only for wishlist trips.
@@ -474,6 +477,15 @@ When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/up
 | POST | `/api/trips/:tripId/photos` | multipart/form-data | Upload one or more photos |
 | PATCH | `/api/trips/:tripId/photos/:id` | `{ caption }` | Update caption |
 | DELETE | `/api/trips/:tripId/photos/:id` | — | Delete photo (removes file from disk) |
+
+**Bulk / maintenance:**
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| PATCH | `/api/trips/:tripId/photos` | `{ ids, lat, lng, location_id?, geo_source? }` | Places several items (or clears with `lat`/`lng` null); `geo_source` `manual` (default) or `estimated` |
+| POST | `/api/trips/:tripId/photos/retry` | `{ ids? }` | Re-queues failed processing (all of the trip's when `ids` is omitted) |
+
+`POST /api/trips/:tripId/photos` answers `{ photos, failed: [{ name, reason }] }` (`201` if anything was saved, `400` otherwise).
 
 **Upload form fields:**
 - `photos` (one or more files, up to 50 per request: photos — jpg, png, gif, webp, avif, heic, tiff, max 50 MB — and videos — mov, mp4, webm, max 4 GB. The type is detected from the content and non-media files are rejected with `400`)

@@ -1,5 +1,5 @@
-import axios from 'axios';
-import type { Trip, Location, Photo, Expense, Track } from '../types';
+import axios, { isAxiosError } from 'axios';
+import type { Trip, Location, Photo, Expense, Track, UploadFailure, UploadFailureReason } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
@@ -123,11 +123,33 @@ export const photosApi = {
     files.forEach((f) => formData.append('photos', f));
     if (locationId != null) formData.append('location_id', String(locationId));
     if (caption) formData.append('caption', caption);
-    return api.post<Photo[]>(`/trips/${tripId}/photos`, formData, {
+    return api.post<{ photos: Photo[]; failed: UploadFailure[] }>(`/trips/${tripId}/photos`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 0, // big videos can take a while to upload
     });
   },
+
+  /**
+   * Uploads and never throws: returns what was saved and, per file, why the
+   * rest wasn't (refused by the server, or the request itself failed).
+   */
+  uploadSafe: async (tripId: number, files: File[], locationId?: number, caption?: string) => {
+    try {
+      const { data } = await photosApi.upload(tripId, files, locationId, caption);
+      return data;
+    } catch (err) {
+      const data = isAxiosError(err) ? err.response?.data : undefined;
+      if (data && Array.isArray(data.failed) && data.failed.length) return { photos: [] as Photo[], failed: data.failed as UploadFailure[] };
+      return { photos: [] as Photo[], failed: files.map((f) => ({ name: f.name, reason: requestFailureReason(err) })) };
+    }
+  },
+
+  /** Place several items on the map (or clear their position with null). */
+  locate: (tripId: number, data: { ids: number[]; lat: number | null; lng: number | null; location_id?: number | null; geo_source?: 'manual' | 'estimated' }) =>
+    api.patch<{ updated: number }>(`/trips/${tripId}/photos`, data),
+
+  /** Retry background processing (all failed items of the trip when ids is omitted). */
+  retry: (tripId: number, ids?: number[]) => api.post<{ queued: number }>(`/trips/${tripId}/photos/retry`, ids ? { ids } : {}),
 
   updateCaption: (tripId: number, photoId: number, caption: string) =>
     api.patch<Photo>(`/trips/${tripId}/photos/${photoId}`, { caption }),
@@ -135,6 +157,15 @@ export const photosApi = {
   delete: (tripId: number, photoId: number) =>
     api.delete<{ message: string }>(`/trips/${tripId}/photos/${photoId}`),
 };
+
+/** Why a whole upload request failed, from the HTTP status (or lack of one). */
+export function requestFailureReason(err: unknown): UploadFailureReason {
+  if (!isAxiosError(err) || !err.response) return 'network';
+  const status = err.response.status;
+  if (status === 413) return 'too_large_proxy'; // a reverse proxy's body size limit
+  if (status === 502 || status === 503 || status === 504) return 'server_unavailable';
+  return 'server_error';
+}
 
 // ─── Geocoding (OpenStreetMap Nominatim — free, no API key) ──────────────────
 export const geocode = async (query: string) => {

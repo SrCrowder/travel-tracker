@@ -23,7 +23,22 @@ export interface Photo {
   height?: number | null;
   /** Seconds (videos) */
   duration?: number | null;
+  /** Background processing: tries so far and last error */
+  attempts?: number;
+  error?: string | null;
+  /** Where lat/lng come from: the file's GPS, set by hand, or estimated */
+  geo_source?: 'exif' | 'manual' | 'estimated' | null;
   created_at: string;
+}
+
+/** Why a file of an upload was refused (server reason codes + client-side ones). */
+export type UploadFailureReason =
+  | 'unsupported_format' | 'too_large' | 'video_unsupported_server'
+  | 'too_large_proxy' | 'server_unavailable' | 'network' | 'server_error';
+
+export interface UploadFailure {
+  name: string;
+  reason: UploadFailureReason;
 }
 
 export interface Location {

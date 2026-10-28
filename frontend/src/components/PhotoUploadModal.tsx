@@ -41,10 +41,12 @@ interface PhotoUploadModalProps {
   locations: Location[];
   /** Pre-select a location when opened from the location panel */
   defaultLocationId?: number;
+  /** Some files were saved but others failed (the modal stays open) */
+  onUploaded?: () => void;
 }
 
 export default function PhotoUploadModal({
-  isOpen, onClose, onSuccess, tripId, locations, defaultLocationId,
+  isOpen, onClose, onSuccess, tripId, locations, defaultLocationId, onUploaded,
 }: PhotoUploadModalProps) {
   const { t } = useTranslation();
   const [files, setFiles] = useState<File[]>([]);
@@ -79,10 +81,24 @@ export default function PhotoUploadModal({
       const photos = files.filter((f) => !isVideoFile(f));
       for (let i = 0; i < photos.length; i += PHOTO_BATCH) batches.push(photos.slice(i, i + PHOTO_BATCH));
       let done = 0;
+      const failedFiles: File[] = [];
+      const reasons: string[] = [];
       for (const batch of batches) {
-        await photosApi.upload(tripId, batch, locationId !== '' ? Number(locationId) : undefined, caption || undefined);
+        const result = await photosApi.uploadSafe(tripId, batch, locationId !== '' ? Number(locationId) : undefined, caption || undefined);
+        for (const f of result.failed) {
+          const file = batch.find((b) => b.name === f.name);
+          if (file) failedFiles.push(file);
+          reasons.push(`${f.name}: ${t(`importPhotos.reasons.${f.reason}`)}`);
+        }
         done += batch.length;
         setUploaded(done);
+      }
+      if (failedFiles.length) {
+        // Keep only what failed, with the reasons, so it can be fixed or retried
+        setFiles(failedFiles);
+        setError(reasons.join(' · '));
+        onUploaded?.();
+        return;
       }
       onSuccess();
       handleClose();

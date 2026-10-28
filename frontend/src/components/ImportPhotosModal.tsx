@@ -15,7 +15,10 @@ import {
   readPhotoInfo, reverseGeocode, type PhotoCluster, type PhotoInfo,
 } from '../lib/photoImport';
 import { inputClass, labelClass } from './addTrip/types';
-import type { Trip } from '../types';
+import type { Trip, UploadFailure, UploadFailureReason } from '../types';
+
+// Refusals that a second try can't fix
+const FINAL_REASONS: UploadFailureReason[] = ['unsupported_format', 'too_large', 'video_unsupported_server'];
 
 interface ImportPhotosModalProps {
   isOpen: boolean;
@@ -60,7 +63,10 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
   const [autoPlaces, setAutoPlaces] = useState(true);
 
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [failed, setFailed] = useState<string[]>([]);
+  // Files that didn't make it, with the reason (and what's needed to retry them)
+  const [failed, setFailed] = useState<Array<UploadFailure & { file?: File; locationId: number | null }>>([]);
+  const [saved, setSaved] = useState(0);
+  const [unlocated, setUnlocated] = useState(0);
   const [resultTripId, setResultTripId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
@@ -74,7 +80,7 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
     setStep('select'); setPhotos([]); setReadCount(0); setClusters([]); setUnplaced([]); setRejected(0);
     setDestination(defaultTripId ? 'existing' : 'new'); setTripId(defaultTripId ?? '');
     setTitle(''); setStartDate(''); setEndDate(''); setAutoPlaces(true);
-    setProgress({ done: 0, total: 0 }); setFailed([]); setResultTripId(null); setError('');
+    setProgress({ done: 0, total: 0 }); setFailed([]); setSaved(0); setUnlocated(0); setResultTripId(null); setError('');
   };
 
   useEffect(() => {
@@ -206,34 +212,56 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
       const general = photos.filter((p) => !placed.has(p.file)).map((p) => p.file);
       if (general.length) groups.push({ locationId: null, files: general });
 
-      const failedNames: string[] = [];
-      let done = 0;
-      for (const group of groups) {
-        for (const batch of batches(group.files)) {
-          try {
-            await photosApi.upload(targetTrip.id, batch, group.locationId ?? undefined);
-          } catch {
-            // One retry, then report the files that didn't make it
-            try {
-              await photosApi.upload(targetTrip.id, batch, group.locationId ?? undefined);
-            } catch {
-              failedNames.push(...batch.map((f) => f.name));
-            }
-          }
-          done += batch.length;
-          setProgress({ done, total: photos.length });
-        }
-      }
-
-      setFailed(failedNames);
       setResultTripId(targetTrip.id);
-      qc.invalidateQueries({ queryKey: ['trips'] });
-      qc.invalidateQueries({ queryKey: ['trip', String(targetTrip.id)] });
-      setStep('done');
+      await uploadAll(targetTrip.id, groups.flatMap((g) => g.files.map((file) => ({ file, locationId: g.locationId }))));
     } catch {
       setError(t('importPhotos.errors.failed'));
       setStep('review');
     }
+  };
+
+  /** Uploads in small batches; a failed request is retried once before reporting its files. */
+  const uploadAll = async (tripId: number, jobs: Array<{ file: File; locationId: number | null }>) => {
+    setStep('uploading');
+    setProgress({ done: 0, total: jobs.length });
+    const byLocation = new Map<number | null, File[]>();
+    for (const job of jobs) byLocation.set(job.locationId, [...(byLocation.get(job.locationId) ?? []), job.file]);
+
+    const failures: typeof failed = [];
+    let done = 0, ok = 0, noGps = 0;
+    for (const [locationId, files] of byLocation) {
+      for (const batch of batches(files)) {
+        let result = await photosApi.uploadSafe(tripId, batch, locationId ?? undefined);
+        const retryable = result.failed.filter((f) => !FINAL_REASONS.includes(f.reason));
+        if (retryable.length) {
+          const again = batch.filter((f) => retryable.some((r) => r.name === f.name));
+          const second = await photosApi.uploadSafe(tripId, again, locationId ?? undefined);
+          result = {
+            photos: [...result.photos, ...second.photos],
+            failed: [...result.failed.filter((f) => FINAL_REASONS.includes(f.reason)), ...second.failed],
+          };
+        }
+        ok += result.photos.length;
+        noGps += result.photos.filter((p) => p.lat == null).length;
+        for (const f of result.failed) failures.push({ ...f, file: batch.find((b) => b.name === f.name), locationId });
+        done += batch.length;
+        setProgress({ done, total: jobs.length });
+      }
+    }
+
+    setFailed(failures);
+    setSaved((n) => n + ok);
+    setUnlocated((n) => n + noGps);
+    qc.invalidateQueries({ queryKey: ['trips'] });
+    qc.invalidateQueries({ queryKey: ['trip', String(tripId)] });
+    setStep('done');
+  };
+
+  const retryFailed = () => {
+    if (!resultTripId) return;
+    const jobs = failed.filter((f) => f.file && !FINAL_REASONS.includes(f.reason))
+      .map((f) => ({ file: f.file!, locationId: f.locationId }));
+    if (jobs.length) void uploadAll(resultTripId, jobs);
   };
 
   if (!isOpen) return null;
@@ -415,17 +443,41 @@ export default function ImportPhotosModal({ isOpen, onClose, defaultTripId }: Im
             {/* ── Done ── */}
             {step === 'done' && (
               <div className="py-8 flex flex-col items-center gap-3 text-center">
-                {failed.length === 0
+                {failed.filter((f) => !FINAL_REASONS.includes(f.reason)).length === 0
                   ? <CheckCircle2 size={36} className="text-emerald-500" />
                   : <AlertTriangle size={36} className="text-amber-500" />}
                 <p className="text-sm text-slate-700 dark:text-slate-200">
-                  {t('importPhotos.done', { count: progress.total - failed.length })}
+                  {t('importPhotos.done', { count: saved })}
                 </p>
+                <p className="text-xs text-slate-500 max-w-md">{t('importPhotos.processingNote')}</p>
                 {failed.length > 0 && (
-                  <div className="text-xs text-amber-700 dark:text-amber-400 max-w-md">
-                    {t('importPhotos.failed', { count: failed.length })}
-                    <p className="mt-1 text-slate-400 break-all">{failed.join(', ')}</p>
+                  <div className="w-full max-w-lg text-left text-xs bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 space-y-2">
+                    <p className="font-semibold text-amber-800 dark:text-amber-300">{t('importPhotos.failed', { count: failed.length })}</p>
+                    {/* Grouped by reason, so the cause is obvious */}
+                    {[...new Set(failed.map((f) => f.reason))].map((reason) => {
+                      const names = failed.filter((f) => f.reason === reason).map((f) => f.name);
+                      return (
+                        <div key={reason}>
+                          <p className="text-amber-800 dark:text-amber-300">
+                            {t(`importPhotos.reasons.${reason}`)} ({names.length})
+                          </p>
+                          <p className="text-slate-500 break-all">{names.slice(0, 30).join(', ')}{names.length > 30 ? '…' : ''}</p>
+                        </div>
+                      );
+                    })}
+                    {failed.some((f) => f.file && !FINAL_REASONS.includes(f.reason)) && (
+                      <button onClick={retryFailed}
+                        className="mt-1 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">
+                        {t('importPhotos.retryFailed')}
+                      </button>
+                    )}
                   </div>
+                )}
+                {unlocated > 0 && resultTripId && (
+                  <button onClick={() => { onClose(); navigate(`/trip/${resultTripId}?locate=1`); }}
+                    className="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700">
+                    <MapPin size={15} /> {t('importPhotos.locateMissing', { count: unlocated })}
+                  </button>
                 )}
               </div>
             )}

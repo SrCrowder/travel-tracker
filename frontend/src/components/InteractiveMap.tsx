@@ -8,6 +8,7 @@ import {
   GeoJSON,
   Tooltip,
   useMap,
+  useMapEvents,
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -43,9 +44,14 @@ function createPinIcon(index: number, isSelected: boolean): L.DivIcon {
 
 function createMediaIcon(photo: Photo): L.DivIcon {
   const play = photo.media_type === 'video' ? '<div class="media-marker-play">▶</div>' : '';
+  // Nothing to show until the background job makes the thumbnail
+  const preview = photo.thumb_filename || (photo.status === 'ready' && photo.media_type === 'image')
+    ? `<img src="${thumbUrl(photo)}" alt="" loading="lazy" />` : '<div class="media-marker-empty">📷</div>';
+  // Positions set by hand or estimated look slightly different
+  const estimated = photo.geo_source === 'estimated' ? ' estimated' : '';
   return L.divIcon({
     className: '',
-    html: `<div class="media-marker"><img src="${thumbUrl(photo)}" alt="" loading="lazy" />${play}</div>`,
+    html: `<div class="media-marker${estimated}">${preview}${play}</div>`,
     iconSize: [44, 44],
     iconAnchor: [22, 22],
   });
@@ -60,6 +66,12 @@ function createClusterIcon(cluster: { getChildCount(): number; getAllChildMarker
     iconSize: [48, 48],
     iconAnchor: [24, 24],
   });
+}
+
+// Reports clicks on the map while choosing a position
+function PickPoint({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({ click: (e) => onPick(e.latlng.lat, e.latlng.lng) });
+  return null;
 }
 
 // Fits the map to the points whenever they change
@@ -91,6 +103,8 @@ interface InteractiveMapProps {
   onMediaClick?: (photo: Photo) => void;
   /** GPS tracks drawn as lines */
   tracks?: Track[];
+  /** While set, a click on the map calls it (placing photos without GPS) */
+  onPick?: (lat: number, lng: number) => void;
   height?: string;
 }
 
@@ -101,6 +115,7 @@ export default function InteractiveMap({
   media = [],
   onMediaClick,
   tracks = [],
+  onPick,
   height = '520px',
 }: InteractiveMapProps) {
   const { t } = useTranslation();
@@ -160,7 +175,9 @@ export default function InteractiveMap({
       initial={{ opacity: 0, scale: 0.99 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
-      className="relative rounded-2xl overflow-hidden shadow-card border border-slate-200 dark:border-slate-700"
+      className={`relative rounded-2xl overflow-hidden shadow-card border ${
+        onPick ? 'map-picking border-primary-500 ring-4 ring-primary-400/30' : 'border-slate-200 dark:border-slate-700'
+      }`}
       style={{ height }}
     >
       <MapContainer
@@ -266,6 +283,7 @@ export default function InteractiveMap({
           </MarkerClusterGroup>
         )}
 
+        {onPick && <PickPoint onPick={onPick} />}
         <AutoBounds points={framePoints} />
       </MapContainer>
 

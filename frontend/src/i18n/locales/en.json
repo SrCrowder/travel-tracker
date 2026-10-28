@@ -234,7 +234,13 @@
     "processingLong": "Preparing the video for the browser…",
     "failed": "Error",
     "failedLong": "This video could not be converted. You can download the original.",
-    "downloadOriginal": "Download original"
+    "downloadOriginal": "Download original",
+    "processingPhoto": "Preparing the photo…",
+    "processingCount_one": "Preparing {{count}} photo/video in the background…",
+    "processingCount_other": "Preparing {{count}} photos/videos in the background…",
+    "failedCount_one": "{{count}} could not be processed (the original is saved)",
+    "failedCount_other": "{{count}} could not be processed (the originals are saved)",
+    "retry": "Retry"
   },
   "importPhotos": {
     "title": "Import photos & videos",
@@ -275,7 +281,20 @@
       "titleDates": "Add a title and the trip dates.",
       "pickTrip": "Choose the trip to add them to.",
       "failed": "Could not create or update the trip. Please try again."
-    }
+    },
+    "reasons": {
+      "unsupported_format": "Not a supported photo or video",
+      "too_large": "The photo is over the server's size limit (MAX_IMAGE_MB)",
+      "video_unsupported_server": "The server has no ffmpeg for videos",
+      "too_large_proxy": "Refused for size by the reverse proxy (raise client_max_body_size in NPM/nginx)",
+      "server_unavailable": "The server wasn't answering (restarted or out of memory?)",
+      "network": "The connection dropped during the upload",
+      "server_error": "Server error"
+    },
+    "retryFailed": "Retry the failed ones",
+    "locateMissing_one": "Place {{count}} photo/video without GPS on the map",
+    "locateMissing_other": "Place {{count}} photos/videos without GPS on the map",
+    "processingNote": "Thumbnails, HEIC photos and videos are prepared in the background: you can close this window."
   },
   "tripStatus": {
     "done": "Done",
@@ -353,5 +372,25 @@
     "confirmRestore": "ALL trips will be replaced with the ones in \"{{name}}\". Continue?",
     "restored": "Backup restored: {{trips}} trips and {{files}} files.",
     "restoreFailed": "Could not restore the backup"
+  },
+  "locate": {
+    "title_one": "{{count}} photo/video without location",
+    "title_other": "{{count}} photos/videos without location",
+    "explain": "They had no GPS, so they only show in the timeline. Place them to see them on the map too.",
+    "selectAll": "Select all",
+    "selectNone": "Clear selection",
+    "applySuggestions_one": "Place {{count}} automatically",
+    "applySuggestions_other": "Place {{count}} automatically",
+    "assignToPlace": "Assign to a place…",
+    "pickOnMap": "Click on the map",
+    "cancelPick": "Cancel",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "pickHint_one": "Click on the map where it was taken",
+    "pickHint_other": "Click on the map where the {{count}} were taken",
+    "suggestion": {
+      "time": "Suggested: position of the closest photo in time with GPS",
+      "place": "Suggested: position of its place"
+    }
   }
 }

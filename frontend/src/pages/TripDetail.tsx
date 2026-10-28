@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Calendar, MapPin, Clock, Tag, Trash2, MoreVertical, Pencil, ImagePlus, FileDown, Loader2, Images, Link2,
-  Sparkles, CalendarClock, FolderDown,
+  Sparkles, CalendarClock, FolderDown, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { tripsApi, locationsApi, getImageUrl, allMedia } from '../api/client';
+import { tripsApi, locationsApi, photosApi, getImageUrl, allMedia } from '../api/client';
+import UnlocatedMediaPanel from '../components/UnlocatedMediaPanel';
 import Navbar from '../components/Navbar';
 import InteractiveMap from '../components/InteractiveMap';
 import LocationPanel from '../components/LocationPanel';
@@ -57,6 +58,10 @@ export default function TripDetail() {
   const [uploadDefaultLocationId, setUploadDefaultLocationId] = useState<number | undefined>();
   const [importOpen, setImportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // Ids of the photos waiting for a click on the map (placing items without GPS)
+  const [pickingIds, setPickingIds] = useState<number[] | null>(null);
+  const [searchParams] = useSearchParams();
+  const wantsLocate = searchParams.get('locate') === '1';
   const [mapLightbox, setMapLightbox] = useState<{ photos: Photo[]; index: number } | null>(null);
 
   const openUploadModal = (locationId?: number) => {
@@ -85,6 +90,14 @@ export default function TripDetail() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trip]);
 
+  // Coming from the import ("place the photos without GPS"): open the map tab at the panel
+  useEffect(() => {
+    if (!wantsLocate || !trip) return;
+    setActiveTab('map');
+    const timer = setTimeout(() => document.getElementById('unlocated-media')?.scrollIntoView({ behavior: 'smooth' }), 600);
+    return () => clearTimeout(timer);
+  }, [wantsLocate, trip?.id]);
+
   const deleteTrip = useMutation({
     mutationFn: () => tripsApi.delete(Number(id)),
     onSuccess: () => {
@@ -107,6 +120,13 @@ export default function TripDetail() {
   const durationDays = tripDays(trip);
   const refreshTrip = () => qc.invalidateQueries({ queryKey: ['trip', id] });
 
+  const placePicked = async (lat: number, lng: number) => {
+    if (!pickingIds?.length) return;
+    await photosApi.locate(trip.id, { ids: pickingIds, lat, lng, geo_source: 'manual' });
+    setPickingIds(null);
+    refreshTrip();
+  };
+
   const reorderLocations = async (ordered: Location[]) => {
     await locationsApi.reorder(trip.id, ordered.map((l, i) => ({ id: l.id, order_index: i })));
     refreshTrip();
@@ -118,6 +138,8 @@ export default function TripDetail() {
   const media = allMedia(trip);
   const geotaggedMedia = media.filter((p) => p.lat != null && p.lng != null);
   const locationName = new Map(sortedLocations.map((l) => [l.id, l.name]));
+  const processing = media.filter((p) => p.status === 'processing').length;
+  const failedMedia = media.filter((p) => p.status === 'failed').length;
 
   const handleDeleteTrip = () => {
     if (window.confirm(t('tripDetail.deleteConfirm', { title: trip.title }))) {
@@ -295,6 +317,28 @@ export default function TripDetail() {
           </motion.p>
         )}
 
+        {/* Background processing of photos/videos */}
+        {(processing > 0 || failedMedia > 0) && (
+          <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm rounded-xl px-4 py-3 bg-slate-100 dark:bg-slate-800">
+            {processing > 0 && (
+              <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Loader2 size={15} className="animate-spin text-primary-500" />
+                {t('media.processingCount', { count: processing })}
+              </span>
+            )}
+            {failedMedia > 0 && (
+              <span className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <AlertTriangle size={15} />
+                {t('media.failedCount', { count: failedMedia })}
+                <button onClick={async () => { await photosApi.retry(trip.id); refreshTrip(); }}
+                  className="flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700">
+                  <RefreshCw size={13} /> {t('media.retry')}
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-white dark:bg-slate-800 p-1 rounded-xl w-fit max-w-full overflow-x-auto shadow-card">
           {TAB_IDS.map((tabId) => (
@@ -345,6 +389,7 @@ export default function TripDetail() {
                   }
                   media={geotaggedMedia}
                   tracks={trip.tracks}
+                  onPick={pickingIds ? placePicked : undefined}
                   onMediaClick={(photo) =>
                     setMapLightbox({ photos: geotaggedMedia, index: geotaggedMedia.findIndex((p) => p.id === photo.id) })
                   }
@@ -397,10 +442,26 @@ export default function TripDetail() {
                   )}
                 </AnimatePresence>
               </div>
+              {/* Photos/videos without GPS: place them so they appear on the map */}
+              <div className="lg:col-span-3 -mt-6">
+                <UnlocatedMediaPanel
+                  tripId={trip.id}
+                  media={media}
+                  locations={sortedLocations}
+                  picking={!!pickingIds}
+                  onPickOnMap={(ids) => {
+                    setPickingIds(ids);
+                    document.querySelector('.leaflet-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  onCancelPick={() => setPickingIds(null)}
+                  onChanged={refreshTrip}
+                />
+              </div>
             </motion.div>
           )}
 
           {/* ── EXPENSES TAB ── */}
+
           {activeTab === 'expenses' && (
             <motion.div
               key="expenses"
@@ -495,6 +556,7 @@ export default function TripDetail() {
         tripId={trip.id}
         locations={sortedLocations}
         defaultLocationId={uploadDefaultLocationId}
+        onUploaded={refreshTrip}
         onSuccess={() => {
           setUploadModalOpen(false);
           qc.invalidateQueries({ queryKey: ['trip', id] });

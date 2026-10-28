@@ -31,7 +31,25 @@ La app queda en el puerto **5173** (ponla detrás de tu proxy inverso). Para act
 | `WEB_USER` / `WEB_PASSWORD` | Activa el login. Sin `WEB_PASSWORD` la app queda abierta (pensado para la red local). |
 | `ALLOWED_HOSTS` | Nombres/IP con los que entras (p. ej. `viajes.midominio.com,192.168.1.10:5173`). **Recomendado si no usas login.** |
 | `MAX_IMAGE_MB` / `MAX_VIDEO_MB` | Tamaño máximo por foto (50) y por vídeo (4096). |
+| `MEDIA_WORKERS` / `FFMPEG_THREADS` | Cuántos archivos se procesan a la vez en segundo plano (1) y cuántos hilos usa cada conversión de vídeo (2). Súbelos si el servidor va sobrado. |
 | `SEED_DEMO` | `false` para empezar sin los 3 viajes de ejemplo. |
+
+### Proxy inverso (Nginx Proxy Manager u otro)
+
+Para importar muchos archivos o vídeos grandes, en el host del proxy → *Advanced* añade:
+
+```nginx
+client_max_body_size 0;
+proxy_request_buffering off;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+```
+
+Sin esto el proxy puede cortar los vídeos grandes; la importación lo indica como «rechazado por tamaño en el proxy inverso».
+
+### Cómo se procesan las fotos y vídeos
+
+La subida solo guarda el original (intacto) y lee su fecha y GPS, así que nunca falla por falta de recursos. Las miniaturas, las fotos HEIC y la conversión de vídeos (HEVC/HDR → MP4) se hacen después en una cola en segundo plano, con 3 reintentos y que continúa tras un reinicio. La página del viaje muestra lo pendiente y permite reintentar lo que falle. Las fotos y vídeos sin GPS se pueden ubicar desde la pestaña *Mapa* (automáticamente por la hora, asignándolos a un lugar o haciendo clic en el mapa).
 
 ## Desarrollo
 
