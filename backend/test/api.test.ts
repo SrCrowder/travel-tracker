@@ -5,6 +5,7 @@ import { useTestEnv, PNG, listUploads } from './env';
 const env = useTestEnv();
 const { default: app } = await import('../src/app');
 const { initDatabase } = await import('../src/database');
+const { mediaQueueIdle } = await import('../src/services/mediaJobs');
 initDatabase();
 
 const api = request(app);
@@ -149,6 +150,8 @@ describe('photos', () => {
 
   it('rejects files that are not images and leaves nothing on disk', async () => {
     const trip = await createTrip();
+    // Earlier uploads may still be writing their thumbnails
+    await mediaQueueIdle();
     const before = listUploads(env.uploadsDir).length;
     const html = Buffer.from('<html><script>alert(1)</script></html>');
 
