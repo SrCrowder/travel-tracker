@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Compass, X, LogOut, Images, DatabaseBackup } from 'lucide-react';
+import { Search, Plus, Compass, X, LogOut, Images, DatabaseBackup, Users, MoreHorizontal, Languages } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { authApi, type AuthStatus } from '../api/client';
+import { useQuery } from '@tanstack/react-query';
+import type { AuthStatus } from '../api/client';
 import DarkModeToggle from './DarkModeToggle';
 import BackupModal from './BackupModal';
+import UsersModal from './UsersModal';
+import Portal from './Portal';
+import { useLogout } from '../hooks/useLogout';
 import { useStore } from '../store/useStore';
 import i18n from '../i18n';
 import type { Language } from '../store/useStore';
@@ -22,17 +25,15 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
   const { t } = useTranslation();
   const [searchFocused, setSearchFocused] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
+  // Phones: backup, users, language and logout live in a menu
+  const [moreOpen, setMoreOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   // Already fetched by App — read from the cache
   const { data: auth } = useQuery<AuthStatus>({ queryKey: ['auth'], enabled: false });
 
-  const handleLogout = async () => {
-    await authApi.logout();
-    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
-    queryClient.setQueryData<AuthStatus>(['auth'], { authRequired: true, authenticated: false });
-  };
+  const handleLogout = useLogout();
 
   // Global keyboard shortcut: Cmd/Ctrl+K to focus search
   useEffect(() => {
@@ -109,7 +110,7 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
           <div className="flex items-center gap-2 shrink-0">
 
             {/* Language selector */}
-            <div className="flex items-center text-sm font-medium">
+            <div className="hidden sm:flex items-center text-sm font-medium">
               {(['es', 'en'] as Language[]).map((lang, i) => (
                 <span key={lang} className="flex items-center">
                   {i > 0 && <span className="text-slate-300 dark:text-slate-600 mx-0.5">|</span>}
@@ -138,16 +139,34 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
               <DatabaseBackup size={18} />
             </button>
 
+            <button
+              onClick={() => setUsersOpen(true)}
+              title={t('users.title')}
+              aria-label={t('users.title')}
+              className="hidden sm:block p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Users size={18} />
+            </button>
+
             {auth?.authRequired && (
               <button
                 onClick={handleLogout}
                 title={t('auth.logout')}
                 aria-label={t('auth.logout')}
-                className="p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
+                className="hidden sm:block p-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
                 <LogOut size={18} />
               </button>
             )}
+
+            <button
+              onClick={() => setMoreOpen((v) => !v)}
+              aria-label={t('nav.more')}
+              aria-expanded={moreOpen}
+              className="sm:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              <MoreHorizontal size={18} />
+            </button>
 
             {onImport && (
               <button
@@ -174,10 +193,44 @@ export default function Navbar({ onAddTrip, onImport }: NavbarProps) {
           </div>
         </div>
       </div>
+      {moreOpen && (
+        <Portal>
+          <div className="fixed inset-0 z-[1290]" onClick={() => setMoreOpen(false)} />
+          <div role="menu" className="fixed top-16 right-3 z-[1300] w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1.5 text-sm"
+            onClick={() => setMoreOpen(false)}>
+            <button role="menuitem" onClick={() => setBackupOpen(true)}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+              <DatabaseBackup size={16} /> {t('backup.title')}
+            </button>
+            <button role="menuitem" onClick={() => setUsersOpen(true)}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+              <Users size={16} /> {t('users.title')}
+            </button>
+            <div className="flex items-center gap-2.5 px-4 py-2.5 text-slate-700 dark:text-slate-200">
+              <Languages size={16} />
+              {(['es', 'en'] as Language[]).map((lang) => (
+                <button key={lang} role="menuitemradio" aria-checked={language === lang}
+                  onClick={(e) => { e.stopPropagation(); handleLanguageChange(lang); }}
+                  className={`px-2 py-0.5 rounded-lg font-medium ${language === lang ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300' : 'text-slate-400'}`}>
+                  {lang.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            {auth?.authRequired && (
+              <button role="menuitem" onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 border-t border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+                <LogOut size={16} /> {t('auth.logout')}
+              </button>
+            )}
+          </div>
+        </Portal>
+      )}
+
       {/* BackupModal renders in <body> (the navbar's backdrop-blur would
           otherwise make "fixed" relative to the navbar, off screen) */}
       <AnimatePresence>
         {backupOpen && <BackupModal onClose={() => setBackupOpen(false)} />}
+        {usersOpen && <UsersModal loginEnabled={!!auth?.authRequired} onClose={() => setUsersOpen(false)} />}
       </AnimatePresence>
     </nav>
   );

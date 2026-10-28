@@ -6,11 +6,13 @@ import Dashboard from './pages/Dashboard';
 import TripDetail from './pages/TripDetail';
 import Login from './pages/Login';
 import SharedTrip from './pages/SharedTrip';
+import GuestHome from './pages/GuestHome';
 import LoadingSpinner from './components/LoadingSpinner';
 import { authApi, AUTH_EXPIRED_EVENT } from './api/client';
 import { useStore } from './store/useStore';
 
-// Share links are public: they skip the login gate
+// Share links handle their own login (SharedTrip); users who aren't the admin
+// only get share links
 function Gate({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { t } = useTranslation();
@@ -24,6 +26,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   if (pathname.startsWith('/share/')) return <Routes><Route path="/share/:token" element={<SharedTrip />} /></Routes>;
   if (isLoading) return <LoadingSpinner message={t('common.loading')} />;
   if (auth?.authRequired && !auth.authenticated) return <Login />;
+  if (auth?.role === 'user') return <GuestHome name={auth.username ?? ''} />;
   return <>{children}</>;
 }
 

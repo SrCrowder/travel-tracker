@@ -178,3 +178,11 @@ export function validate<T extends z.ZodType>(schema: T, data: unknown, res: Res
   });
   return undefined;
 }
+
+// ─── Users (share-link viewers) ───────────────────────────────────────────────
+const username = z.string().trim().min(1).max(64)
+  .regex(/^[\p{L}\p{N}._@-]+$/u, 'letters, numbers and . _ @ - only');
+const password = z.string().min(8, 'at least 8 characters').max(200);
+
+export const userCreateSchema = z.object({ username, password });
+export const userUpdateSchema = z.object({ username: username.optional(), password: password.optional() });

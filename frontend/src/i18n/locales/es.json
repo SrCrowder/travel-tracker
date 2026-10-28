@@ -15,7 +15,8 @@
     "title": "Mi Diario de Viajes",
     "searchPlaceholder": "Buscar viajes, lugares… (⌘K)",
     "newTrip": "Nuevo viaje",
-    "import": "Importar fotos"
+    "import": "Importar fotos",
+    "more": "Más opciones"
   },
   "darkMode": {
     "toLight": "Cambiar a modo claro",
@@ -66,7 +67,7 @@
     "photos_other": "{{count}} fotos/vídeos",
     "fullscreen": "Pantalla completa",
     "exitFullscreen": "Salir de pantalla completa",
-    "lockedHint": "Abre el mapa en pantalla completa para moverlo"
+    "lockedHint": "Para mover el mapa, ábrelo en pantalla completa"
   },
   "calendar": {
     "title": "Calendario de viajes",
@@ -230,7 +231,10 @@
     "invalid": "Usuario o contraseña incorrectos",
     "tooMany": "Demasiados intentos fallidos. Inténtalo más tarde.",
     "error": "No se pudo iniciar sesión",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "shareSubtitle": "Inicia sesión para ver este viaje compartido",
+    "guestTitle": "Hola, {{name}}",
+    "guestExplain": "Con tu usuario puedes ver los viajes que te compartan. Abre el enlace que te hayan enviado."
   },
   "media": {
     "processing": "Procesando…",
@@ -327,7 +331,8 @@
     "copied": "Copiado",
     "revoke": "Desactivar el enlace",
     "invalid": "Este enlace ya no es válido.",
-    "sharedTrip": "Viaje compartido"
+    "sharedTrip": "Viaje compartido",
+    "explainLogin": "Quien tenga el enlace podrá ver este viaje (mapa, cronología, fotos y vídeos) después de iniciar sesión con tu usuario o con uno de los usuarios que hayas creado. Las notas privadas, los gastos y el presupuesto no se muestran."
   },
   "expenses": {
     "summary": "Resumen",
@@ -395,5 +400,27 @@
       "time": "Sugerido: posición de la foto con GPS más cercana en el tiempo",
       "place": "Sugerido: posición de su lugar"
     }
+  },
+  "users": {
+    "title": "Usuarios",
+    "explain": "Pueden iniciar sesión solo para ver los viajes que compartas con un enlace. No ven tus otros viajes ni pueden cambiar nada.",
+    "loginOff": "El inicio de sesión está desactivado: los enlaces se abren sin usuario. Define WEB_PASSWORD en el compose para activarlo.",
+    "empty": "Aún no hay usuarios.",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "newPassword": "Nueva contraseña",
+    "passwordHint": "Mínimo 8 caracteres",
+    "add": "Añadir usuario",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "changePassword": "Cambiar contraseña",
+    "delete": "Eliminar",
+    "deleteConfirm": "¿Eliminar el usuario «{{name}}»? Dejará de poder abrir los enlaces.",
+    "lastLogin": "Último acceso: {{date}}",
+    "neverLoggedIn": "Nunca ha entrado",
+    "passwordChanged": "Contraseña cambiada: se ha cerrado su sesión en todos los dispositivos.",
+    "taken": "Ese nombre de usuario ya existe",
+    "invalid": "Revisa el usuario (letras, números y . _ @ -) y la contraseña (mínimo 8 caracteres)",
+    "error": "No se pudo guardar"
   }
 }

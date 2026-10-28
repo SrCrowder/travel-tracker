@@ -9,7 +9,8 @@ Diario de viajes autoalojado: viajes con su ruta en el mapa, cronología día a 
 - **Fotos y vídeos** en el mapa (clic para abrir/reproducir), en la cronología por días y en la galería. Los originales se guardan intactos; los MOV/HEVC se convierten a MP4 para el navegador.
 - **Mapa del mundo** con los países visitados, **gastos** con presupuesto, **rutas GPX/KML**.
 - **Compartir** un viaje con un enlace de solo lectura, **exportar** un viaje con sus archivos originales (ZIP), **copia de seguridad** completa, **PDF**.
-- Login opcional, español/inglés, modo oscuro, instalable como app (PWA).
+- Login opcional con **usuarios**: el admin crea usuarios que solo pueden abrir los enlaces compartidos (con el login activado, los enlaces piden iniciar sesión).
+- Español/inglés, modo oscuro, instalable como app (PWA). En móvil el mapa se mueve en pantalla completa para no hacer zoom sin querer al desplazar la página.
 
 ## Instalar en el servidor
 
@@ -28,7 +29,7 @@ La app queda en el puerto **5173** (ponla detrás de tu proxy inverso). Para act
 
 | Variable | Para qué |
 |---|---|
-| `WEB_USER` / `WEB_PASSWORD` | Activa el login. Sin `WEB_PASSWORD` la app queda abierta (pensado para la red local). |
+| `WEB_USER` / `WEB_PASSWORD` | Activa el login: es el usuario **admin**. Los demás usuarios se crean en la app (menú *Usuarios*) y solo pueden ver los viajes compartidos. Sin `WEB_PASSWORD` la app y los enlaces quedan abiertos (pensado para la red local). |
 | `ALLOWED_HOSTS` | Nombres/IP con los que entras (p. ej. `viajes.midominio.com,192.168.1.10:5173`). **Recomendado si no usas login.** |
 | `MAX_IMAGE_MB` / `MAX_VIDEO_MB` | Tamaño máximo por foto (50) y por vídeo (4096). |
 | `MEDIA_WORKERS` / `FFMPEG_THREADS` | Cuántos archivos se procesan a la vez en segundo plano (1) y cuántos hilos usa cada conversión de vídeo (2). Súbelos si el servidor va sobrado. |

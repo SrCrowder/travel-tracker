@@ -24,7 +24,24 @@ api.interceptors.response.use(undefined, (error) => {
 export interface AuthStatus {
   authRequired: boolean;
   authenticated: boolean;
+  /** admin: the whole app; user: only share links */
+  role?: 'admin' | 'user' | null;
+  username?: string | null;
 }
+
+export interface AppUser {
+  id: number;
+  username: string;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export const usersApi = {
+  list: () => api.get<AppUser[]>('/users'),
+  create: (username: string, password: string) => api.post<AppUser>('/users', { username, password }),
+  update: (id: number, data: { username?: string; password?: string }) => api.patch<AppUser>(`/users/${id}`, data),
+  delete: (id: number) => api.delete(`/users/${id}`),
+};
 
 export const authApi = {
   me: () => api.get<AuthStatus>('/auth/me'),

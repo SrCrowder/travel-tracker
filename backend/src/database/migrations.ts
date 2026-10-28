@@ -151,6 +151,21 @@ const migrations: Array<(db: Database) => void> = [
       UPDATE photos SET geo_source = 'exif' WHERE lat IS NOT NULL;
     `);
   },
+
+  // 5 — users created by the admin, who can open share links. Bumping
+  //     session_version logs a user out everywhere (password change).
+  (db) => {
+    db.exec(`
+      CREATE TABLE users (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        username        TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+        password_hash   TEXT    NOT NULL,
+        session_version INTEGER NOT NULL DEFAULT 1,
+        created_at      TEXT    DEFAULT (datetime('now')),
+        last_login_at   TEXT
+      );
+    `);
+  },
 ];
 
 export const SCHEMA_VERSION = migrations.length;

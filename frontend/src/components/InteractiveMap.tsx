@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -13,7 +13,7 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MarkerClusterGroup from 'react-leaflet-cluster';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Images, Maximize2, Minimize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { thumbUrl } from '../api/client';
@@ -155,6 +155,34 @@ export default function InteractiveMap({
   const [touch] = useState(isTouchScreen);
   const locked = touch && !fullscreen;
 
+  // Trying to move the locked map (sideways swipe or pinch): say how, point at the button
+  const [nudge, setNudge] = useState(false);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const nudgeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const showNudge = () => {
+    setNudge(true);
+    clearTimeout(nudgeTimer.current);
+    nudgeTimer.current = setTimeout(() => setNudge(false), 2500);
+  };
+  useEffect(() => () => clearTimeout(nudgeTimer.current), []);
+  useEffect(() => { if (!locked) setNudge(false); }, [locked]);
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (!locked) return;
+    if (e.touches.length > 1) return showNudge();
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!locked || !touchStart.current) return;
+    if (e.touches.length > 1) return showNudge();
+    const dx = Math.abs(e.touches[0].clientX - touchStart.current.x);
+    const dy = Math.abs(e.touches[0].clientY - touchStart.current.y);
+    // Up/down is scrolling the page, which is fine
+    if (dx > 30 && dx > dy * 1.5) {
+      touchStart.current = null;
+      showNudge();
+    }
+  };
+
   useEffect(() => {
     if (!fullscreen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
@@ -226,6 +254,8 @@ export default function InteractiveMap({
         onPick ? 'map-picking border-primary-500 ring-4 ring-primary-400/30' : 'border-slate-200 dark:border-slate-700'
       }`}
       style={{ height: fullscreen ? '100dvh' : height }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
     >
       <MapContainer
         center={center}
@@ -336,16 +366,46 @@ export default function InteractiveMap({
         <Interaction locked={locked} fullscreen={fullscreen} />
       </MapContainer>
 
-      {/* Full screen: the only way to move the map on touch screens */}
-      <button
-        onClick={() => setFullscreen((v) => !v)}
-        aria-label={t(fullscreen ? 'map.exitFullscreen' : 'map.fullscreen')}
-        title={t(fullscreen ? 'map.exitFullscreen' : locked ? 'map.lockedHint' : 'map.fullscreen')}
-        className="absolute left-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[1000] flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl shadow-lg border bg-white/95 dark:bg-slate-800/95 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-primary-300"
-      >
-        {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        {(touch || fullscreen) && t(fullscreen ? 'map.exitFullscreen' : 'map.fullscreen')}
-      </button>
+      {/* Locked map: how to move it */}
+      <AnimatePresence>
+        {nudge && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[1000] flex items-center justify-center bg-black/30 pointer-events-none p-6">
+            <p className="flex items-center gap-2 bg-black/75 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-xl text-center">
+              <Maximize2 size={16} className="shrink-0" /> {t('map.lockedHint')}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Full screen: the only way to move the map on touch screens. The exit
+          button sits well above the bottom edge, clear of Android's on-screen
+          navigation and the iPhone home bar. */}
+      {fullscreen ? (
+        <button
+          onClick={() => setFullscreen(false)}
+          aria-label={t('map.exitFullscreen')}
+          className="absolute left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-[1000] flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-full shadow-2xl bg-primary-600 hover:bg-primary-700 text-white ring-4 ring-white/80 dark:ring-slate-900/80 whitespace-nowrap"
+        >
+          <Minimize2 size={18} /> {t('map.exitFullscreen')}
+        </button>
+      ) : (
+        <motion.button
+          onClick={() => setFullscreen(true)}
+          aria-label={t('map.fullscreen')}
+          title={t(locked ? 'map.lockedHint' : 'map.fullscreen')}
+          animate={nudge ? { scale: [1, 1.15, 1, 1.15, 1] } : { scale: 1 }}
+          transition={{ duration: 1.2 }}
+          className={`absolute left-3 bottom-3 z-[1001] flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl shadow-lg border transition-colors ${
+            nudge
+              ? 'bg-primary-600 border-primary-600 text-white ring-4 ring-primary-400/50'
+              : 'bg-white/95 dark:bg-slate-800/95 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-primary-300'
+          }`}
+        >
+          <Maximize2 size={14} />
+          {touch && t('map.fullscreen')}
+        </motion.button>
+      )}
 
       {/* Photos layer toggle */}
       {geotagged.length > 0 && (

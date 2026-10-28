@@ -7,8 +7,9 @@ import { uploadHeaders } from '../middleware/upload';
 import { UPLOADS_DIR } from '../config';
 import type { TripRow } from '../types';
 
-// Read-only access to one trip through its share link: no login needed, but
-// only that trip and its own files, and nothing private (notes, budget).
+// Read-only access to one trip through its share link: only that trip and its
+// own files, and nothing private (notes, budget). With the login on, app.ts
+// also requires a session (the admin or a user the admin created).
 const router = Router();
 
 const tripByToken = (token: string) =>

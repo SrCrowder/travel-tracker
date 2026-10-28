@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Link2, Copy, Check, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { tripsApi } from '../api/client';
+import { useQuery } from '@tanstack/react-query';
+import { tripsApi, type AuthStatus } from '../api/client';
 import type { Trip } from '../types';
 import Portal from './Portal';
 
@@ -20,6 +21,8 @@ export default function ShareDialog({ trip, onClose, onChanged }: ShareDialogPro
   const [token, setToken] = useState(trip.share_token ?? null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { data: auth } = useQuery<AuthStatus>({ queryKey: ['auth'], enabled: false });
+  const loginOn = !!auth?.authRequired;
 
   const run = async (action: () => Promise<string | null>) => {
     setBusy(true);
@@ -53,7 +56,7 @@ export default function ShareDialog({ trip, onClose, onChanged }: ShareDialogPro
             <X size={18} />
           </button>
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{t('share.explain')}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t(loginOn ? 'share.explainLogin' : 'share.explain')}</p>
 
         {token ? (
           <>

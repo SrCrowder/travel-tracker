@@ -7,7 +7,7 @@ import { isAxiosError } from 'axios';
 import { authApi } from '../api/client';
 import DarkModeToggle from '../components/DarkModeToggle';
 
-export default function Login() {
+export default function Login({ subtitle }: { subtitle?: string }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
@@ -51,7 +51,7 @@ export default function Login() {
             <Compass size={24} className="text-white" />
           </div>
           <h1 className="font-playfair font-bold text-2xl text-slate-800 dark:text-white">{t('auth.title')}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t('auth.subtitle')}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{subtitle ?? t('auth.subtitle')}</p>
         </div>
 
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" htmlFor="username">

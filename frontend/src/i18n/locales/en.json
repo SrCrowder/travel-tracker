@@ -15,7 +15,8 @@
     "title": "My Travel Log",
     "searchPlaceholder": "Search trips, places… (⌘K)",
     "newTrip": "New Trip",
-    "import": "Import photos"
+    "import": "Import photos",
+    "more": "More options"
   },
   "darkMode": {
     "toLight": "Switch to light mode",
@@ -66,7 +67,7 @@
     "photos_other": "{{count}} photos/videos",
     "fullscreen": "Full screen",
     "exitFullscreen": "Exit full screen",
-    "lockedHint": "Open the map in full screen to move it"
+    "lockedHint": "To move the map, open it in full screen"
   },
   "calendar": {
     "title": "Travel Calendar",
@@ -230,7 +231,10 @@
     "invalid": "Wrong username or password",
     "tooMany": "Too many failed attempts. Try again later.",
     "error": "Could not sign in",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "shareSubtitle": "Log in to see this shared trip",
+    "guestTitle": "Hi, {{name}}",
+    "guestExplain": "Your account can see the trips shared with you. Open the link you were sent."
   },
   "media": {
     "processing": "Processing…",
@@ -327,7 +331,8 @@
     "copied": "Copied",
     "revoke": "Turn the link off",
     "invalid": "This link is no longer valid.",
-    "sharedTrip": "Shared trip"
+    "sharedTrip": "Shared trip",
+    "explainLogin": "Anyone with the link can see this trip (map, timeline, photos and videos) after logging in as you or as one of the users you created. Private notes, expenses and the budget are not shown."
   },
   "expenses": {
     "summary": "Summary",
@@ -395,5 +400,27 @@
       "time": "Suggested: position of the closest photo in time with GPS",
       "place": "Suggested: position of its place"
     }
+  },
+  "users": {
+    "title": "Users",
+    "explain": "They can log in only to see the trips you share with a link. They don't see your other trips and can't change anything.",
+    "loginOff": "Login is off: links open without an account. Set WEB_PASSWORD in the compose file to turn it on.",
+    "empty": "No users yet.",
+    "username": "Username",
+    "password": "Password",
+    "newPassword": "New password",
+    "passwordHint": "At least 8 characters",
+    "add": "Add user",
+    "save": "Save",
+    "cancel": "Cancel",
+    "changePassword": "Change password",
+    "delete": "Delete",
+    "deleteConfirm": "Delete the user “{{name}}”? They will no longer be able to open links.",
+    "lastLogin": "Last login: {{date}}",
+    "neverLoggedIn": "Never logged in",
+    "passwordChanged": "Password changed: they were logged out on every device.",
+    "taken": "That username already exists",
+    "invalid": "Check the username (letters, numbers and . _ @ -) and the password (at least 8 characters)",
+    "error": "Could not save"
   }
 }

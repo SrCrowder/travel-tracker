@@ -31,7 +31,8 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 | World map | Dashboard map of visited countries (and planned ones), drawn from the locations' country codes — no tile server needed |
 | Expenses & budget | Per-trip expenses (category, date, place, any currency); totals per category, per day and against the budget |
 | GPS tracks | Upload GPX/KML files (watch, Strava, Wikiloc, Google My Maps…); drawn on the trip map with their distance |
-| Share link | Read-only public page of a trip (map, timeline, photos/videos) — no login needed; notes, expenses and budget stay private; revocable |
+| Share link | Read-only page of a trip (map, timeline, photos/videos); notes, expenses and budget stay private; revocable. With the login on, opening it requires logging in as the admin or one of the admin's users |
+| Users | The admin (`WEB_USER`) creates users that can only open share links (navbar → *Users*); password change or deletion ends their sessions |
 | Trip export | Per trip, a ZIP with every photo/video **exactly as uploaded** (HEIC, MOV… with their metadata), named as on the device and grouped per place, plus `trip.json`, `expenses.csv`, the cover and the tracks as GeoJSON |
 | Backup | Download everything (database + all files) as a ZIP; restore a ZIP (the previous database is kept as `pre-restore-*.db`) |
 | Reorder route | Drag (or use the keyboard on) the handle in the trip's location list |
@@ -117,7 +118,7 @@ travel-tracker/
 │       │   ├── index.ts        # initDatabase(): migrate, seed demo data on a new DB
 │       │   └── seed.ts         # Seeds example data if DB is empty
 │       ├── middleware/
-│       │   ├── auth.ts         # Optional login (WEB_USER / WEB_PASSWORD), session cookie
+│       │   ├── auth.ts         # Optional login: admin (WEB_USER / WEB_PASSWORD) and users, session cookie
 │       │   └── upload.ts       # Multer config (10 MB/file, UUID filenames, image content check)
 │       ├── routes/
 │       │   ├── trips.ts        # CRUD for trips, cover image upload
@@ -319,7 +320,7 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 | `FFMPEG_PATH` / `FFPROBE_PATH` | `ffmpeg` / `ffprobe` | Needed for videos (included in the Docker image). Without them video uploads are refused |
 | `ALLOWED_HOSTS` | *(empty)* | Comma-separated host names the app is reached by (e.g. `travel.example.com,192.168.1.10:5173`). Other `Host` headers get `421`, which blocks DNS-rebinding attacks. **Recommended when the login is off** |
 | `SEED_DEMO` | `true` | Adds 3 demo trips **only when the database is created**. Set `false` to start empty |
-| `WEB_USER` | `admin` | Login username (only used when `WEB_PASSWORD` is set) |
+| `WEB_USER` | `admin` | Admin username (only used when `WEB_PASSWORD` is set). Other users are created in the app and can only open share links |
 | `WEB_PASSWORD` | *(empty)* | Set it to require a login for the whole app (API and photos). Empty = no login, fine on a private LAN |
 | `SESSION_DAYS` | `30` | How long a login lasts |
 | `SESSION_SECRET` | *(auto)* | Key that signs session cookies. If unset, a random one is created in `data/session.secret`. Changing `WEB_PASSWORD` logs everyone out |
@@ -432,15 +433,26 @@ Migrations run with **foreign keys off** (so a table can be rebuilt — `DROP TA
 
 Base URL: `http://localhost:3001` (dev) or via nginx proxy `/api/` (production)
 
-When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/uploads/*` returns `401` without a valid session cookie.
+When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/uploads/*` returns `401` without a valid session cookie. Sessions are the admin's (everything) or a user's (only `/api/public/*`; anything else answers `403`).
 
 ### Auth
 
 | Method | Path | Body | Description |
 |---|---|---|---|
-| GET | `/api/auth/me` | — | `{ authRequired, authenticated }` |
-| POST | `/api/auth/login` | `{ username, password }` | Sets the `tt_session` cookie. `401` on wrong credentials, `429` after 10 failures in 15 min from the same IP, or 100 in total from all IPs (blocks new logins only; open sessions keep working) |
+| GET | `/api/auth/me` | — | `{ authRequired, authenticated, role: 'admin' \| 'user' \| null, username }` |
+| POST | `/api/auth/login` | `{ username, password }` | Admin or user (username is case-insensitive). Sets the `tt_session` cookie. `401` on wrong credentials, `429` after 10 failures in 15 min from the same IP, or 100 in total from all IPs (blocks new logins only; open sessions keep working) |
 | POST | `/api/auth/logout` | — | Clears the session cookie |
+
+### Users (admin only)
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| GET | `/api/users` | — | `[{ id, username, created_at, last_login_at }]` |
+| POST | `/api/users` | `{ username, password }` | Username: letters, numbers, `. _ @ -`, max 64; password ≥ 8 chars. `409` if taken (or equal to `WEB_USER`) |
+| PATCH | `/api/users/:id` | `{ username?, password? }` | A new password logs the user out everywhere |
+| DELETE | `/api/users/:id` | — | Ends their sessions too |
+
+Passwords are stored as scrypt hashes. Users are not part of the backup ZIP, and a restore leaves them as they are.
 
 ### Trips
 
@@ -504,8 +516,8 @@ When `WEB_PASSWORD` is set, every `/api/*` route (except `/api/auth/*`) and `/up
 |---|---|---|
 | POST | `/api/trips/:id/share` | Creates (or returns) the trip's share token |
 | DELETE | `/api/trips/:id/share` | Turns the link off |
-| GET | `/api/public/trips/:token` | **No login.** The trip, without notes, budget or expenses |
-| GET | `/api/public/:token/media/:filename` | **No login.** Only that trip's cover, photos/videos and thumbnails |
+| GET | `/api/public/trips/:token` | Any session (admin or user) when the login is on; open otherwise. The trip, without notes, budget or expenses |
+| GET | `/api/public/:token/media/:filename` | Same access. Only that trip's cover, photos/videos and thumbnails |
 
 The frontend page is `/share/:token`.
 
@@ -539,7 +551,7 @@ Tracks are also included in `GET /api/trips/:id` (`tracks[].geojson`).
 ### Security notes
 
 - Writes to `/api` from another website (`Origin` ≠ host) are refused with `403`.
-- With `WEB_PASSWORD` set, everything except `/api/auth`, `/api/public` and `/health` needs the session cookie.
+- With `WEB_PASSWORD` set, everything except `/api/auth` and `/health` needs the session cookie; users (not the admin) only get `/api/public`.
 
 ### Health
 
