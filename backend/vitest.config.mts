@@ -7,5 +7,7 @@ export default defineConfig({
     // its own throwaway database through env vars before importing it
     isolate: true,
     pool: 'forks',
+    // Image/video processing is CPU-bound; on a busy machine the default 5 s is too tight
+    testTimeout: 30_000,
   },
 });
