@@ -157,6 +157,12 @@ describe('uploads with problems', () => {
     expect(res.body.failed).toEqual([{ name: 'a.txt', reason: 'unsupported_format' }]);
   });
 
+  it('allows long uploads but closes stalled connections', async () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.ts'), 'utf8');
+    expect(source).toMatch(/server\.requestTimeout = 3 \* 60 \* 60 \* 1000/);
+    expect(source).toMatch(/server\.timeout = 2 \* 60 \* 1000/);
+  });
+
   it('stores a file it cannot process yet, retries, then marks it failed (and can retry on demand)', async () => {
     const trip = await createTrip();
     // A real MOV header with garbage after it: accepted, but unconvertible

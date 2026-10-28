@@ -19,11 +19,14 @@ router.get('/trips/:token', (req: Request, res: Response) => {
   if (!row) return res.status(404).json({ error: 'This link is not valid anymore' });
 
   const trip = getTrip(row.id)!;
+  // Internal processing details (error messages, retries) stay private too
+  const publicMedia = <T extends { error: unknown; attempts: unknown }>(p: T) => ({ ...p, error: null, attempts: undefined });
   res.json({
     ...trip,
     share_token: undefined,
     budget: undefined,
-    locations: trip.locations.map((l) => ({ ...l, notes: '' })),
+    photos: trip.photos.map(publicMedia),
+    locations: trip.locations.map((l) => ({ ...l, notes: '', photos: l.photos.map(publicMedia) })),
   });
 });
 

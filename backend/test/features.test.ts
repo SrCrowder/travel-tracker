@@ -168,6 +168,8 @@ describe('share links', () => {
     expect(shared.locations[0].notes).toBe('');
     expect(shared.budget).toBeUndefined();
     expect(shared.share_token).toBeUndefined();
+    expect(shared.photos[0].error).toBeNull();
+    expect(shared.photos[0].attempts).toBeUndefined();
 
     expect((await api.get(`/api/public/${token}/media/${photo.filename}`)).status).toBe(200);
     expect((await api.get(`/api/public/${token}/media/${photo.thumb_filename}`)).status).toBe(200);

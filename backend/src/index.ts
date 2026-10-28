@@ -25,5 +25,9 @@ const server = app.listen(PORT, () => {
 });
 
 // Big videos on a slow connection take longer than Node's default 5 minutes
-// per request; uploads are streamed to disk, so there's no reason to cut them.
-server.requestTimeout = 0;
+// per request (4 GB at ~5 Mbit/s ≈ 2 h). A request may last up to 3 hours, but
+// a connection that stops sending data for 2 minutes is closed, so stalled
+// clients can't hold sockets forever.
+server.requestTimeout = 3 * 60 * 60 * 1000;
+server.headersTimeout = 60 * 1000;
+server.timeout = 2 * 60 * 1000;
