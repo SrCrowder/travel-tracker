@@ -27,6 +27,7 @@ import TracksPanel from '../components/TracksPanel';
 import { formatTripRange, tripDays } from '../lib/tripDates';
 import { useDateLocale } from '../i18n/useDateLocale';
 import { useTripPdfExport } from '../hooks/useTripPdfExport';
+import { mediaPlaceName } from '../lib/mediaPlace';
 import type { Trip, Location, Photo } from '../types';
 
 const TAG_COLORS: Record<string, string> = {
@@ -83,6 +84,8 @@ export default function TripDetail() {
   const [searchParams] = useSearchParams();
   const wantsLocate = searchParams.get('locate') === '1';
   const [mapLightbox, setMapLightbox] = useState<{ photos: Photo[]; index: number } | null>(null);
+  // Photo shown in the viewer opened from the map: the map follows it
+  const [mapFocus, setMapFocus] = useState<Photo | null>(null);
 
   const openUploadModal = (locationId?: number) => {
     setUploadDefaultLocationId(locationId);
@@ -157,7 +160,7 @@ export default function TripDetail() {
   );
   const media = allMedia(trip);
   const geotaggedMedia = media.filter((p) => p.lat != null && p.lng != null);
-  const locationName = new Map(sortedLocations.map((l) => [l.id, l.name]));
+  const placeName = mediaPlaceName(sortedLocations);
   const processing = media.filter((p) => p.status === 'processing').length;
   const failedMedia = media.filter((p) => p.status === 'failed').length;
 
@@ -420,6 +423,7 @@ export default function TripDetail() {
                   media={geotaggedMedia}
                   tracks={trip.tracks}
                   onPick={pickingIds ? placePicked : undefined}
+                  focus={mapFocus}
                   onMediaClick={(photo) =>
                     setMapLightbox({ photos: geotaggedMedia, index: geotaggedMedia.findIndex((p) => p.id === photo.id) })
                   }
@@ -573,8 +577,9 @@ export default function TripDetail() {
           <Lightbox
             photos={mapLightbox.photos}
             startIndex={mapLightbox.index}
-            onClose={() => setMapLightbox(null)}
-            placeName={(p) => (p.location_id ? locationName.get(p.location_id) : undefined)}
+            onClose={() => { setMapLightbox(null); setMapFocus(null); }}
+            placeName={placeName}
+            onPhotoChange={setMapFocus}
           />
         )}
       </AnimatePresence>

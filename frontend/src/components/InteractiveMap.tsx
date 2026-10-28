@@ -14,7 +14,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { motion } from 'framer-motion';
-import { Loader2, Images } from 'lucide-react';
+import { Loader2, Images, Maximize2, Minimize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { thumbUrl } from '../api/client';
 import type { Location, Photo, Track } from '../types';
@@ -92,6 +92,35 @@ function AutoBounds({ points }: { points: [number, number][] }) {
   return null;
 }
 
+// Moves the map to the photo being viewed
+function FlyTo({ point }: { point?: { lat?: number | null; lng?: number | null } | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (point?.lat != null && point.lng != null) map.flyTo([point.lat, point.lng], Math.max(map.getZoom(), 15), { duration: 0.8 });
+  }, [point, map]);
+  return null;
+}
+
+// Touch screens: the map ignores gestures until it's opened in full screen,
+// so scrolling the page doesn't pan or zoom it by accident
+function Interaction({ locked, fullscreen }: { locked: boolean; fullscreen: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    const handlers = [map.dragging, map.touchZoom, map.doubleClickZoom, map.scrollWheelZoom, map.boxZoom, map.keyboard];
+    handlers.forEach((h) => (locked ? h.disable() : h.enable()));
+    // Page scroll still works over the map, pinch zoom of the page doesn't
+    map.getContainer().style.touchAction = locked ? 'pan-x pan-y' : '';
+  }, [locked, map]);
+  // The container changed size
+  useEffect(() => {
+    const timer = setTimeout(() => map.invalidateSize(), 50);
+    return () => clearTimeout(timer);
+  }, [fullscreen, map]);
+  return null;
+}
+
+const isTouchScreen = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+
 type RouteMode = 'straight' | 'roads';
 
 interface InteractiveMapProps {
@@ -105,6 +134,8 @@ interface InteractiveMapProps {
   tracks?: Track[];
   /** While set, a click on the map calls it (placing photos without GPS) */
   onPick?: (lat: number, lng: number) => void;
+  /** Fly to this point when it changes (photo shown in the viewer) */
+  focus?: { lat?: number | null; lng?: number | null } | null;
   height?: string;
 }
 
@@ -116,9 +147,25 @@ export default function InteractiveMap({
   onMediaClick,
   tracks = [],
   onPick,
+  focus,
   height = '520px',
 }: InteractiveMapProps) {
   const { t } = useTranslation();
+  const [fullscreen, setFullscreen] = useState(false);
+  const [touch] = useState(isTouchScreen);
+  const locked = touch && !fullscreen;
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [fullscreen]);
   const [routeMode, setRouteMode] = useState<RouteMode>('straight');
   const geotagged = media.filter((p) => p.lat != null && p.lng != null);
   const [showMedia, setShowMedia] = useState(true);
@@ -175,10 +222,10 @@ export default function InteractiveMap({
       initial={{ opacity: 0, scale: 0.99 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4 }}
-      className={`relative rounded-2xl overflow-hidden shadow-card border ${
+      className={`overflow-hidden ${fullscreen ? 'fixed inset-0 z-[2000] bg-slate-100 dark:bg-slate-900' : 'relative rounded-2xl shadow-card border'} ${
         onPick ? 'map-picking border-primary-500 ring-4 ring-primary-400/30' : 'border-slate-200 dark:border-slate-700'
       }`}
-      style={{ height }}
+      style={{ height: fullscreen ? '100dvh' : height }}
     >
       <MapContainer
         center={center}
@@ -285,13 +332,26 @@ export default function InteractiveMap({
 
         {onPick && <PickPoint onPick={onPick} />}
         <AutoBounds points={framePoints} />
+        <FlyTo point={focus} />
+        <Interaction locked={locked} fullscreen={fullscreen} />
       </MapContainer>
+
+      {/* Full screen: the only way to move the map on touch screens */}
+      <button
+        onClick={() => setFullscreen((v) => !v)}
+        aria-label={t(fullscreen ? 'map.exitFullscreen' : 'map.fullscreen')}
+        title={t(fullscreen ? 'map.exitFullscreen' : locked ? 'map.lockedHint' : 'map.fullscreen')}
+        className="absolute left-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[1000] flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl shadow-lg border bg-white/95 dark:bg-slate-800/95 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-primary-300"
+      >
+        {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        {(touch || fullscreen) && t(fullscreen ? 'map.exitFullscreen' : 'map.fullscreen')}
+      </button>
 
       {/* Photos layer toggle */}
       {geotagged.length > 0 && (
         <button
           onClick={() => setShowMedia((v) => !v)}
-          className={`absolute top-3 left-3 z-[1000] flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl shadow-lg border transition-colors ${
+          className={`absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-[1000] flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl shadow-lg border transition-colors ${
             showMedia
               ? 'bg-primary-600 border-primary-600 text-white'
               : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
@@ -304,7 +364,7 @@ export default function InteractiveMap({
 
       {/* Route mode toggle — only shown when there are at least 2 locations */}
       {sorted.length > 1 && (
-        <div className="absolute top-3 right-3 z-[1000] flex items-center bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-[1000] flex items-center bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
           <button
             onClick={() => setRouteMode('straight')}
             className={`px-3 py-1.5 text-xs font-medium transition-colors ${

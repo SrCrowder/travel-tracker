@@ -63,7 +63,10 @@
     "straightLine": "Línea recta",
     "roads": "Carreteras",
     "photos_one": "{{count}} foto",
-    "photos_other": "{{count}} fotos/vídeos"
+    "photos_other": "{{count}} fotos/vídeos",
+    "fullscreen": "Pantalla completa",
+    "exitFullscreen": "Salir de pantalla completa",
+    "lockedHint": "Abre el mapa en pantalla completa para moverlo"
   },
   "calendar": {
     "title": "Calendario de viajes",

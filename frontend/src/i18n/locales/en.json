@@ -63,7 +63,10 @@
     "straightLine": "Straight line",
     "roads": "Roads",
     "photos_one": "{{count}} photo",
-    "photos_other": "{{count}} photos/videos"
+    "photos_other": "{{count}} photos/videos",
+    "fullscreen": "Full screen",
+    "exitFullscreen": "Exit full screen",
+    "lockedHint": "Open the map in full screen to move it"
   },
   "calendar": {
     "title": "Travel Calendar",

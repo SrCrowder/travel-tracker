@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { photosApi } from '../api/client';
 import MediaThumb from './media/MediaThumb';
 import Lightbox from './Lightbox';
+import { mediaPlaceName } from '../lib/mediaPlace';
 import type { Trip, Photo } from '../types';
 
 interface PhotoGalleryProps {
@@ -134,7 +135,7 @@ export default function PhotoGallery({ trip, onPhotoDeleted, readOnly }: PhotoGa
             photos={allPhotos}
             startIndex={lightboxIndex}
             onClose={() => setLightboxIndex(null)}
-            placeName={(p) => allPhotos.find((x) => x.id === p.id)?.locationName}
+            placeName={mediaPlaceName(trip.locations ?? [])}
           />
         )}
       </AnimatePresence>

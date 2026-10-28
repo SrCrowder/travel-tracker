@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, Download, Loader2, AlertTriangle, Camera, MapPin } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -14,9 +14,11 @@ interface LightboxProps {
   onClose: () => void;
   /** Optional label per photo (e.g. its location name) */
   placeName?: (photo: Photo) => string | undefined;
+  /** Called when the user moves to another photo (not for the first one) */
+  onPhotoChange?: (photo: Photo) => void;
 }
 
-export default function Lightbox({ photos, startIndex, onClose, placeName }: LightboxProps) {
+export default function Lightbox({ photos, startIndex, onClose, placeName, onPhotoChange }: LightboxProps) {
   const { t } = useTranslation();
   const dateLocale = useDateLocale();
   const [index, setIndex] = useState(startIndex);
@@ -34,6 +36,14 @@ export default function Lightbox({ photos, startIndex, onClose, placeName }: Lig
     return () => window.removeEventListener('keydown', onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photos.length, onClose]);
+
+  const reported = useRef(startIndex);
+  useEffect(() => {
+    if (index === reported.current) return;
+    reported.current = index;
+    if (photos[index]) onPhotoChange?.(photos[index]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
 
   const photo = photos[index];
   if (!photo) return null;

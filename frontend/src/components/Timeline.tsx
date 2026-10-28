@@ -7,6 +7,7 @@ import { useDateLocale } from '../i18n/useDateLocale';
 import Lightbox from './Lightbox';
 import MediaThumb from './media/MediaThumb';
 import { allMedia } from '../api/client';
+import { mediaPlaceName } from '../lib/mediaPlace';
 import type { Trip, Location, Photo } from '../types';
 
 const STRIP_MAX = 12;
@@ -15,13 +16,22 @@ interface TimelineProps {
   trip: Trip;
 }
 
-function getLocationsForDay(date: Date, locations: Location[]): Location[] {
-  const dateStr = format(date, 'yyyy-MM-dd');
-  return locations.filter((loc) => {
+/**
+ * The places of each day. A place with dated photos is on the days of its
+ * photos: an import that starts and ends in the same city makes one place
+ * spanning the whole trip, which isn't where you were every day. Places
+ * without photos use their dates.
+ */
+function locationsByDay(locations: Location[]): (day: string) => Location[] {
+  const photoDays = new Map(locations.map((loc) => [
+    loc.id,
+    new Set((loc.photos ?? []).map((p) => p.taken_at?.slice(0, 10)).filter((d): d is string => !!d)),
+  ]));
+  return (day) => locations.filter((loc) => {
+    const days = photoDays.get(loc.id)!;
+    if (days.size > 0) return days.has(day);
     if (!loc.date_start) return false;
-    const start = loc.date_start;
-    const end = loc.date_end ?? loc.date_start;
-    return dateStr >= start && dateStr <= end;
+    return day >= loc.date_start && day <= (loc.date_end ?? loc.date_start);
   });
 }
 
@@ -31,7 +41,8 @@ export default function Timeline({ trip }: TimelineProps) {
   const dateLocale = useDateLocale();
 
   const locations = [...(trip.locations ?? [])].sort((a, b) => a.order_index - b.order_index);
-  const locationName = new Map(locations.map((l) => [l.id, l.name]));
+  const placeName = mediaPlaceName(locations);
+  const locationsOn = locationsByDay(locations);
 
   // Photos/videos grouped by the day they were taken (local time)
   const mediaByDay = new Map<string, Photo[]>();
@@ -48,6 +59,13 @@ export default function Timeline({ trip }: TimelineProps) {
   // A wishlist trip without dates nor dated photos has no timeline
   const days = first && last ? eachDayOfInterval({ start: parseISO(first), end: parseISO(last) }) : [];
   const tripStart = parseISO(trip.start_date ?? first ?? '1970-01-01');
+  // A place gets its card the first day it shows up, later days just its name
+  const seen = new Set<number>();
+  const dayPlaces = days.map((day) => locationsOn(format(day, 'yyyy-MM-dd')).map((loc) => {
+    const again = seen.has(loc.id);
+    seen.add(loc.id);
+    return { loc, again };
+  }));
 
   return (
     <>
@@ -57,7 +75,9 @@ export default function Timeline({ trip }: TimelineProps) {
 
           <div className="space-y-1">
             {days.map((day, dayIdx) => {
-              const dayLocations = getLocationsForDay(day, locations);
+              const dayLocations = dayPlaces[dayIdx];
+              const cards = dayLocations.filter((d) => !d.again).map((d) => d.loc);
+              const revisited = dayLocations.filter((d) => d.again).map((d) => d.loc);
               const dayMedia = mediaByDay.get(format(day, 'yyyy-MM-dd')) ?? [];
               const dayNumber = Math.round((day.getTime() - tripStart.getTime()) / 86_400_000) + 1;
               const isFirst = format(day, 'yyyy-MM-dd') === trip.start_date;
@@ -97,9 +117,21 @@ export default function Timeline({ trip }: TimelineProps) {
                       )}
                     </div>
 
-                    {dayLocations.length > 0 ? (
+                    {revisited.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {revisited.map((loc) => (
+                          <span key={loc.id}
+                            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
+                            <MapPin size={11} className="text-primary-500" />
+                            {loc.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {cards.length > 0 ? (
                       <div className="space-y-3">
-                        {dayLocations.map((loc) => (
+                        {cards.map((loc) => (
                           <motion.div
                             key={loc.id}
                             whileHover={{ x: 3 }}
@@ -143,7 +175,7 @@ export default function Timeline({ trip }: TimelineProps) {
                           </motion.div>
                         ))}
                       </div>
-                    ) : dayMedia.length === 0 ? (
+                    ) : dayMedia.length === 0 && revisited.length === 0 ? (
                       <p className="text-sm text-slate-400 dark:text-slate-500 italic pl-1">
                         {t('timeline.travelDay')}
                       </p>
@@ -181,7 +213,7 @@ export default function Timeline({ trip }: TimelineProps) {
             photos={lightbox.photos}
             startIndex={lightbox.index}
             onClose={() => setLightbox(null)}
-            placeName={(p) => (p.location_id ? locationName.get(p.location_id) : undefined)}
+            placeName={placeName}
           />
         )}
       </AnimatePresence>
