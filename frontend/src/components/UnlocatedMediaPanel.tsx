@@ -123,24 +123,24 @@ export default function UnlocatedMediaPanel({
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={applySuggestions} disabled={busy || suggestable === 0}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-medium">
+          className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-medium">
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
           {t('locate.applySuggestions', { count: suggestable })}
         </button>
         <select value="" disabled={busy || ids.length === 0 || locations.length === 0}
           onChange={(e) => e.target.value && assignToPlace(Number(e.target.value))}
-          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-700 dark:text-slate-200 disabled:opacity-40">
+          className="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-700 dark:text-slate-200 disabled:opacity-40">
           <option value="">{t('locate.assignToPlace')}</option>
           {locations.map((l, i) => <option key={l.id} value={l.id}>{i + 1}. {l.name}</option>)}
         </select>
         {picking ? (
           <button onClick={onCancelPick}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-medium">
+            className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-medium">
             <X size={14} /> {t('locate.cancelPick')}
           </button>
         ) : (
           <button onClick={() => onPickOnMap(ids)} disabled={busy || ids.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-primary-300 disabled:opacity-40">
+            className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-primary-300 disabled:opacity-40">
             <Crosshair size={14} /> {t('locate.pickOnMap')}
           </button>
         )}
@@ -148,18 +148,20 @@ export default function UnlocatedMediaPanel({
       </div>
       {picking && <p className="text-xs text-primary-600 font-medium">{t('locate.pickHint', { count: ids.length })}</p>}
 
-      {/* Items */}
-      <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-h-80 overflow-y-auto pr-1">
+      {/* Items. The scroll box wraps the grid: a height-limited grid makes
+          Safari shrink the square rows so the thumbnails pile up */}
+      <div className="max-h-80 overflow-y-auto pr-1">
+      <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
         {unlocated.map((photo) => {
           const isSelected = selected.has(photo.id);
           const suggestion = suggestions.get(photo.id);
           return (
             <button key={photo.id} onClick={() => toggle(photo.id)}
               title={[photo.original_name, photo.taken_at?.replace('T', ' ')].filter(Boolean).join(' · ')}
-              className={`relative aspect-square rounded-lg overflow-hidden ring-2 transition-shadow ${
+              className={`relative block w-full pb-[100%] rounded-lg overflow-hidden ring-2 transition-shadow ${
                 isSelected ? 'ring-primary-500' : 'ring-transparent hover:ring-slate-300'
               }`}>
-              <MediaThumb photo={photo} compact className="w-full h-full" />
+              <div className="absolute inset-0"><MediaThumb photo={photo} compact className="w-full h-full" /></div>
               <span className={`absolute top-1 left-1 w-4 h-4 rounded border-2 border-white shadow ${isSelected ? 'bg-primary-500' : 'bg-black/20'}`} />
               {suggestion && (
                 <span className="absolute bottom-1 right-1 bg-white/90 text-primary-600 rounded-full p-0.5"
@@ -170,6 +172,7 @@ export default function UnlocatedMediaPanel({
             </button>
           );
         })}
+      </div>
       </div>
     </motion.section>
   );

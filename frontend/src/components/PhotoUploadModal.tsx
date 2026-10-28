@@ -178,13 +178,16 @@ export default function PhotoUploadModal({
 
             {/* File previews */}
             {files.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
+              // Scroll box around the grid, padding-based squares: Safari collapses
+              // aspect-square rows inside a height-limited grid
+              <div className="max-h-64 overflow-y-auto">
+              <div className="grid grid-cols-4 gap-2">
                 {files.map((file, i) => (
                   <div
                     key={`${file.name}-${file.size}-${i}`}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 group"
+                    className="relative pb-[100%] rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 group"
                   >
-                    <FilePreview file={file} />
+                    <div className="absolute inset-0"><FilePreview file={file} /></div>
                     <button
                       onClick={() => removeFile(i)}
                       className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
@@ -193,6 +196,7 @@ export default function PhotoUploadModal({
                     </button>
                   </div>
                 ))}
+              </div>
               </div>
             )}
 
