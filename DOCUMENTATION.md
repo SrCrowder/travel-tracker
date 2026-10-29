@@ -100,8 +100,7 @@ Personal travel diary web application. Log trips, locations, photos, and notes. 
 
 ```
 travel-tracker/
-├── docker-compose.yml          # Local build (builds images from source)
-├── docker-compose.hub.yml      # Production (pulls pre-built images from ghcr.io)
+├── docker-compose.yml          # Runs the images published on ghcr.io (build: lines to build from source)
 ├── .github/workflows/ghcr.yml  # Builds and publishes both images on every push to main
 ├── .env.example                # Reference for environment variables
 │
@@ -221,30 +220,23 @@ Vite proxies `/api/` and `/uploads/` to `localhost:3001` automatically (configur
 
 ## 5. Running Locally with Docker
 
-Builds both images from source and starts the full stack. Good for testing production behaviour before pushing to `main`.
+`docker-compose.yml` uses the published images. To build them from source instead (to test changes before pushing to `main`), uncomment the two `build:` lines (`./backend`, `./frontend`), point the `volumes` at local folders (e.g. `./docker-data/db` and `./docker-data/uploads`), then:
 
 ```bash
 cd travel-tracker
-docker compose -f docker-compose.yml up --build
+docker compose up --build
 # App available at http://localhost:5173
-```
-
-Data is persisted in `./docker-data/`:
-```
-docker-data/
-├── db/       ← SQLite file (travel.db)
-└── uploads/  ← Uploaded photos
 ```
 
 Force a clean rebuild (e.g. after changing `package.json`):
 ```bash
-docker compose -f docker-compose.yml build --no-cache
-docker compose -f docker-compose.yml up
+docker compose build --no-cache
+docker compose up
 ```
 
 Stop and remove containers:
 ```bash
-docker compose -f docker-compose.yml down
+docker compose down
 ```
 
 ---
@@ -271,11 +263,11 @@ chmod -R 777 /mnt/nvme/apps/travel-tracker
 
 ### Step 2 — Deploy on the server
 
-Copy `docker-compose.hub.yml` to the server (or edit it there), then:
+Copy `docker-compose.yml` to the server (or edit it there), then:
 
 ```bash
-docker compose -f docker-compose.hub.yml pull
-docker compose -f docker-compose.hub.yml up -d
+docker compose pull
+docker compose up -d
 ```
 
 ### Updating the app
@@ -283,8 +275,8 @@ docker compose -f docker-compose.hub.yml up -d
 Push to `main`, wait for the workflow to finish (Actions tab), then on the server:
 
 ```bash
-docker compose -f docker-compose.hub.yml pull
-docker compose -f docker-compose.hub.yml up -d
+docker compose pull
+docker compose up -d
 ```
 
 ### How the containers communicate
@@ -339,8 +331,7 @@ The frontend container's nginx proxies all `/api/` and `/uploads/` requests to t
 
 SQLite file lives at:
 - **Dev:** `backend/data/travel.db` (created automatically)
-- **Docker local:** `./docker-data/db/travel.db`
-- **Server (`docker-compose.hub.yml`):** `/mnt/nvme/apps/travel-tracker/ddbb/travel.db`
+- **Docker (`docker-compose.yml`):** `/mnt/nvme/apps/travel-tracker/ddbb/travel.db` (or wherever its `volumes` point)
 
 ### Tables
 
@@ -686,19 +677,11 @@ To back up, just copy those two locations. The SQLite file is a single portable 
 ### Reset everything (wipe all data)
 
 ```bash
-docker compose -f docker-compose.hub.yml down
+docker compose down
 rm -rf /mnt/nvme/apps/travel-tracker/ddbb/*
 rm -rf /mnt/nvme/apps/travel-tracker/uploads/*
-docker compose -f docker-compose.hub.yml up -d
+docker compose up -d
 # The app will seed example data on first startup
-```
-
-### Reset for local Docker dev
-
-```bash
-docker compose -f docker-compose.yml down
-rm -rf docker-data/
-docker compose -f docker-compose.yml up -d
 ```
 
 ---
@@ -709,8 +692,8 @@ docker compose -f docker-compose.yml up -d
 
 The reverse proxy (NPM/OpenResty) can't reach port 5173. Check container status:
 ```bash
-docker compose -f docker-compose.hub.yml ps
-docker compose -f docker-compose.hub.yml logs --tail=50
+docker compose ps
+docker compose logs --tail=50
 ```
 Most likely causes:
 - Frontend waiting for backend healthcheck (wait ~30 seconds after first start)
@@ -721,8 +704,8 @@ Most likely causes:
 
 The frontend image was built without an empty `VITE_API_URL`. The images published by GitHub Actions always use an empty value; pull the latest one:
 ```bash
-docker compose -f docker-compose.hub.yml pull
-docker compose -f docker-compose.hub.yml up -d
+docker compose pull
+docker compose up -d
 ```
 
 ### Uploaded images return 404
@@ -735,7 +718,7 @@ If you edit `nginx.conf`, always keep `^~` on the `/api/` and `/uploads/` blocks
 
 ### "Failed to save trip" error
 
-Likely a CORS issue. Ensure `CLIENT_URL: "*"` is set in `docker-compose.hub.yml` under the backend environment, or set it to your exact domain.
+Likely a CORS issue. Ensure `CLIENT_URL: "*"` is set in `docker-compose.yml` under the backend environment, or set it to your exact domain.
 
 ### PDF export is slow
 

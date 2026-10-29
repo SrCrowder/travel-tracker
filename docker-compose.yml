@@ -1,21 +1,36 @@
-# ─── Persistent storage ───────────────────────────────────────────────────────
-# All data lives in ./docker-data/ so it survives container rebuilds.
-# Delete that folder to start fresh (wipes database + uploaded photos).
+# ─── Travel Tracker ───────────────────────────────────────────────────────────
+#
+# Usage:
+#   docker compose pull
+#   docker compose up -d
+#
+# Images are built and published to GitHub (ghcr.io) by GitHub Actions on every
+# push to main (.github/workflows/ghcr.yml). Pin a version with :AAAA.MM.DD or
+# :sha-xxxxxxx instead of :latest if you want to control updates. To build them
+# from the source instead, uncomment the "build:" lines.
+#
+# The frontend uses relative URLs — nginx proxies /api/ and /uploads/ to the
+# backend internally, so this works on any IP or domain without rebuilding.
+#
+# Data persists in /mnt/nvme/apps/travel-tracker/ on the host (change the
+# paths under "volumes" to put it somewhere else).
+# ─────────────────────────────────────────────────────────────────────────────
 
 services:
 
   # ── API (Node + Express + SQLite) ─────────────────────────────────────────
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/srcrowder/travel-tracker-backend:latest
+    # build: ./backend
     container_name: travel-tracker-api
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    # No published port: the frontend's nginx reaches the API over the internal
+    # Docker network (http://backend:3001). Uncomment only to debug the API.
+    # ports:
+    #   - "3001:3001"
     volumes:
-      - ./docker-data/db:/app/data        # SQLite file
-      - ./docker-data/uploads:/app/uploads # Uploaded images
+      - /mnt/nvme/apps/travel-tracker/ddbb:/app/data
+      - /mnt/nvme/apps/travel-tracker/uploads:/app/uploads
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -24,23 +39,25 @@ services:
       # WEB_PASSWORD: change-me
       # Without login, list the host names you use to reach the app (blocks DNS rebinding):
       # ALLOWED_HOSTS: travel.example.com,192.168.1.10:5173
+      # Background processing: files at once / threads per video conversion
+      # MEDIA_WORKERS: 1
+      # FFMPEG_THREADS: 2
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          # Converting iPhone 4K videos (ffmpeg) needs headroom
+          memory: 2g
 
-  # ── Frontend (React built by Vite, served by nginx) ───────────────────────
+  # ── Frontend (React + nginx) ───────────────────────────────────────────────
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        # The browser calls this URL directly, so it must be reachable
-        # from the HOST machine — localhost:3001 is correct when backend
-        # port 3001 is exposed above.
-        VITE_API_URL: ""
+    image: ghcr.io/srcrowder/travel-tracker-frontend:latest
+    # build: ./frontend
     container_name: travel-tracker-ui
     restart: unless-stopped
     ports:
@@ -48,3 +65,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1g

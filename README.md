@@ -14,18 +14,18 @@ Diario de viajes autoalojado: viajes con su ruta en el mapa, cronología día a 
 
 ## Instalar en el servidor
 
-Las imágenes se publican en GitHub Container Registry en cada push a `main`:
+El `docker-compose.yml` usa las imágenes publicadas en GitHub Container Registry, que se generan en cada push a `main`:
 `ghcr.io/srcrowder/travel-tracker-backend` y `ghcr.io/srcrowder/travel-tracker-frontend`.
 
 ```bash
 mkdir -p /mnt/nvme/apps/travel-tracker/{ddbb,uploads}
-docker compose -f docker-compose.hub.yml pull
-docker compose -f docker-compose.hub.yml up -d
+docker compose pull
+docker compose up -d
 ```
 
-La app queda en el puerto **5173** (ponla detrás de tu proxy inverso). Para actualizar, repite `pull` + `up -d`: la base de datos se migra sola al arrancar.
+La app queda en el puerto **5173** (ponla detrás de tu proxy inverso). Para actualizar, repite `pull` + `up -d`: la base de datos se migra sola al arrancar. Para construir las imágenes desde el código en vez de descargarlas, descomenta las líneas `build:` del compose.
 
-### Variables útiles (en `docker-compose.hub.yml`, servicio `backend`)
+### Variables útiles (en `docker-compose.yml`, servicio `backend`)
 
 | Variable | Para qué |
 |---|---|
